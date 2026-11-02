@@ -3,7 +3,7 @@
 import discord
 
 from . import config, i18n
-from .branding import activity_banner_url, activity_icon_url, brand
+from .branding import activity_icon_url, brand
 from .logic import (
     COMPO_STANDARD,
     ROLES,
@@ -51,6 +51,15 @@ COLOUR_CANCELLED = discord.Colour.red()
 # this budget: each is truncated to the budget split across them (never above
 # the 1024 per-field limit). Kept below 6000 to leave room for title/footer.
 EMBED_FIELD_BUDGET = 5000
+
+
+def activity_emoji(event) -> str:
+    """The emoji of an event's type: the one saved when it was posted (a
+    server's own types, see /eventtypes), else the built-in type's, else the
+    "Other" icon for a freely named event."""
+    return _row_get(event, "emoji") or ACTIVITY_EMOJI.get(
+        event["activity"], config.EMOJI_ACTIVITY["Other"]
+    )
 
 
 def _row_get(row, key: str):
@@ -120,8 +129,7 @@ def build_event_embed(
     size = event["size"]
     full = len(party) >= size
 
-    # A member can name an "Other" event freely: fall back to its icon.
-    emoji = ACTIVITY_EMOJI.get(event["activity"], config.EMOJI_ACTIVITY["Other"])
+    emoji = activity_emoji(event)
     title = f"{emoji} {event['title']}"
     if cancelled:
         title = f"❌ {i18n.t('event.cancelled_prefix', lang)} {event['title']}"
@@ -168,7 +176,6 @@ def build_event_embed(
 
     embed = discord.Embed(title=title, description="\n".join(lines), colour=colour)
     brand(embed)
-    embed.set_image(url=activity_banner_url(event["activity"]))
 
     # Share the total-embed budget across the composition and waitlist fields so
     # a maxed siege stays under Discord's 6000-char ceiling (see EMBED_FIELD_BUDGET).
@@ -266,7 +273,7 @@ def build_rsvp_embed(
     party_ids = [s["user_id"] for s in party]
     confirmed, declined, awaiting = rsvp_summary(party_ids, responses)
 
-    emoji = ACTIVITY_EMOJI.get(event["activity"], config.EMOJI_ACTIVITY["Other"])
+    emoji = activity_emoji(event)
     when = f" • 🕘 <t:{event['starts_at']}:R>" if event["starts_at"] else ""
     embed = discord.Embed(
         title=f"{emoji} " + i18n.t("rsvp.title", lang, title=event["title"]),

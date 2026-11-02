@@ -23,12 +23,9 @@ from ..branding import BANNER_URL, brand
 from ..embeds import build_event_embed
 from ..errors import ModalErrorMixin, ViewErrorMixin
 from ..logic import COMPO_OPEN, COMPO_STANDARD
-from ..utils.permissions import member_is_admin
+from ..utils.permissions import member_is_admin, member_is_moderator
 from ..utils.time_parse import ParseError, parse_when
 from ..views import SignupView
-
-# The event types offered by the dropdown, in the order they appear.
-ACTIVITIES = config.ACTIVITIES
 
 # Party setups: value -> (composition mode, size). The human-readable label and
 # description live in the locale catalogs as panel.setup_label_<value> /
@@ -43,29 +40,45 @@ SETUPS = {
 DEFAULT_SETUP = "standard5"
 
 
-class ActivitySelect(discord.ui.Select):
-    """Dropdown of event types: no typing, no typos, no invented types."""
+def visible_event_types(types, is_staff: bool) -> list:
+    """The server's event types a member may pick: staff-only ones are hidden
+    from everyone else."""
+    return [row for row in types if is_staff or not row["staff_only"]]
 
-    def __init__(self, chosen: str | None, lang: str):
+
+class ActivitySelect(discord.ui.Select):
+    """Dropdown of the server's event types (edited with /eventtypes)."""
+
+    def __init__(self, types: list, chosen: str | None, lang: str):
+        self.types = types
+        self.lang = lang
         super().__init__(
             placeholder=i18n.t("panel.activity_placeholder", lang),
             row=0,
             options=self._options(chosen),
         )
 
-    @staticmethod
-    def _options(chosen: str | None) -> list[discord.SelectOption]:
+    def _options(self, chosen: str | None) -> list[discord.SelectOption]:
         return [
             discord.SelectOption(
-                label=name,
-                emoji=config.EMOJI_ACTIVITY[name],
-                default=(name == chosen),
+                label=row["name"],
+                emoji=row["emoji"] or None,
+                description=(
+                    i18n.t("eventtypes.staff_only_label", self.lang)
+                    if row["staff_only"]
+                    else None
+                ),
+                default=(row["name"] == chosen),
             )
-            for name in ACTIVITIES
+            for row in self.types
         ]
 
     async def callback(self, interaction: discord.Interaction):
         self.view.activity = self.values[0]
+        self.view.activity_emoji = next(
+            (row["emoji"] for row in self.types if row["name"] == self.values[0]),
+            None,
+        )
         self.options = self._options(self.values[0])
         await interaction.response.edit_message(
             embed=self.view.summary(), view=self.view
@@ -109,12 +122,13 @@ class EventSetupView(ViewErrorMixin, discord.ui.View):
     lives on the instance — nothing to persist across restarts.
     """
 
-    def __init__(self, lang: str):
+    def __init__(self, types: list, lang: str):
         super().__init__(timeout=600)
         self.lang = lang
         self.activity: str | None = None
+        self.activity_emoji: str | None = None
         self.setup: str = DEFAULT_SETUP
-        self.add_item(ActivitySelect(None, lang))
+        self.add_item(ActivitySelect(types, None, lang))
         self.add_item(SetupSelect(DEFAULT_SETUP, lang))
         # Localize the decorator-defined Continue button per server language.
         for child in self.children:
@@ -125,7 +139,8 @@ class EventSetupView(ViewErrorMixin, discord.ui.View):
         label = i18n.t(f"panel.setup_label_{self.setup}", self.lang)
         description = i18n.t(f"panel.setup_desc_{self.setup}", self.lang)
         if self.activity:
-            type_line = f"{config.EMOJI_ACTIVITY[self.activity]} **{self.activity}**"
+            emoji = self.activity_emoji or config.EMOJI_ACTIVITY["Other"]
+            type_line = f"{emoji} **{self.activity}**"
         else:
             type_line = i18n.t("onboard.not_set", self.lang)
         return discord.Embed(
@@ -283,8 +298,13 @@ class PanelView(ViewErrorMixin, discord.ui.View):
         custom_id="panel:event",
     )
     async def create_event(self, interaction: discord.Interaction, _):
-        lang = await i18n.resolve_lang(interaction.client.db, interaction.guild)
-        view = EventSetupView(lang)
+        db = interaction.client.db
+        lang = await i18n.resolve_lang(db, interaction.guild)
+        types = visible_event_types(
+            await db.get_event_types(interaction.guild_id),
+            await member_is_moderator(db, interaction.user),
+        )
+        view = EventSetupView(types, lang)
         await interaction.response.send_message(
             embed=view.summary(), view=view, ephemeral=True
         )

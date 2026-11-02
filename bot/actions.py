@@ -38,6 +38,14 @@ async def resolve_channel(interaction: discord.Interaction, setting: str):
     return interaction.channel
 
 
+def type_ping_role(guild, event_type):
+    """The role a server's event type pings on creation (see /eventtypes),
+    or None when it has none or the role was deleted."""
+    if event_type is None or not event_type["role_id"]:
+        return None
+    return guild.get_role(event_type["role_id"])
+
+
 async def post_event(
     client, channel, event: dict, lang: str, ping_role=None
 ) -> "discord.Message":
@@ -47,6 +55,11 @@ async def post_event(
     command and the recurring-events loop. Raises on failure; on a persistence
     failure the just-sent message is deleted so no orphan buttons remain.
     """
+    if "emoji" not in event:  # the recurring loop: use the type's current emoji
+        event_type = await client.db.get_event_type(
+            event["guild_id"], event["activity"]
+        )
+        event["emoji"] = event_type["emoji"] if event_type is not None else None
     embed = build_event_embed(event, [], lang=lang)
     if ping_role is not None:
         content = ping_role.mention
@@ -93,7 +106,18 @@ async def publish_event(
     notified. Pinging @everyone is reserved to moderators (mentioning through
     the bot bypasses the member's own permissions).
     """
-    lang = await i18n.resolve_lang(interaction.client.db, interaction.guild)
+    db = interaction.client.db
+    lang = await i18n.resolve_lang(db, interaction.guild)
+    event_type = await db.get_event_type(interaction.guild_id, activity)
+    if event_type is not None and event_type["staff_only"]:
+        if not await member_is_moderator(db, interaction.user):
+            await interaction.response.send_message(
+                i18n.t("eventtypes.staff_only", lang, name=event_type["name"]),
+                ephemeral=True,
+            )
+            return
+    if ping_role is None:
+        ping_role = type_ping_role(interaction.guild, event_type)
     if ping_role is not None:
         is_moderator = await member_is_moderator(
             interaction.client.db, interaction.user
@@ -121,6 +145,7 @@ async def publish_event(
         "starts_at": starts_at,
         "status": "open",
         "groups": groups,
+        "emoji": event_type["emoji"] if event_type is not None else None,
     }
     await interaction.response.defer(ephemeral=True)
     try:

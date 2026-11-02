@@ -13,9 +13,9 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import config, i18n
+from .. import i18n
 from ..branding import brand
-from ..embeds import ROLE_EMOJI
+from ..embeds import ROLE_EMOJI, activity_emoji
 from ..errors import resilient_tick
 from ..logic import ROLES, assign, missing_slots
 from ..utils.dashboard import roster_stats
@@ -59,9 +59,7 @@ def build_dashboard_embed(
                 when = f"<t:{event['starts_at']}:R>"
             else:
                 when = i18n.t("dashboard.no_time", lang)
-            emoji = config.EMOJI_ACTIVITY.get(
-                event["activity"], config.EMOJI_ACTIVITY["Other"]
-            )
+            emoji = activity_emoji(event)
             line = (
                 f"{emoji} **{event['title']}** — {when} · {len(party)}/{event['size']}"
             )

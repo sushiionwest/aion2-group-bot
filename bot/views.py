@@ -14,7 +14,7 @@ from collections import defaultdict
 import discord
 
 from . import config, i18n
-from .embeds import ROLE_EMOJI, ROLE_LABEL, build_event_embed
+from .embeds import ROLE_EMOJI, ROLE_LABEL, activity_emoji, build_event_embed
 from .errors import ViewErrorMixin
 from .logic import (
     COMPO_STANDARD,
@@ -437,9 +437,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             )
             return
 
-        emoji = config.EMOJI_ACTIVITY.get(
-            event["activity"], config.EMOJI_ACTIVITY["Other"]
-        )
+        emoji = activity_emoji(event)
         mentions = join_mentions(entry["user_id"] for entry in matches)
         await interaction.response.send_message(
             i18n.t(

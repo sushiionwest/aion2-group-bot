@@ -343,5 +343,21 @@
   "dashboard.footer": "Mis à jour {updated} · rafraîchi automatiquement",
   "dashboard.posted": "Tableau de bord publié — {link}. Épingle-le pour que les organisateurs le trouvent.",
   "dashboard.refreshed": "Tableau de bord rafraîchi — {link}",
-  "dashboard.forbidden": "Je ne peux pas modifier le tableau enregistré (accès manquant). En publier un nouveau ici ?"
+  "dashboard.forbidden": "Je ne peux pas modifier le tableau enregistré (accès manquant). En publier un nouveau ici ?",
+  "eventtypes.admin_only": "Seul un admin Kisk peut modifier les types d'événements.",
+  "eventtypes.added": "Ajouté :",
+  "eventtypes.updated": "Modifié :",
+  "eventtypes.full": "La liste est pleine : les menus Discord contiennent au plus {max} types. Retires-en un d'abord avec `/eventtypes remove`.",
+  "eventtypes.removed": "**{name}** retiré.",
+  "eventtypes.missing": "Aucun type d'événement ne s'appelle **{name}**. Vois `/eventtypes list`.",
+  "eventtypes.last": "C'est le dernier type d'événement, il ne peut pas être retiré. Ajoutes-en un autre d'abord.",
+  "eventtypes.bad_emoji": "`{value}` n'est pas un emoji que Discord peut afficher dans un menu. Utilise un emoji normal (🏰) ou un emoji du serveur.",
+  "eventtypes.no_everyone": "Un type d'événement ne peut pas mentionner @everyone. Choisis un rôle précis.",
+  "eventtypes.ping_unmentionable": "Attention : {role} n'est pas mentionnable, la mention ne notifiera personne. Active **Autoriser tout le monde à @mentionner ce rôle** dans les réglages du rôle, ou donne à Kisk la permission **Mentionner @everyone, @here et tous les rôles**.",
+  "eventtypes.list_title": "**Types d'événements** (dans l'ordre du menu) :",
+  "eventtypes.list_hint": "Ajoute ou modifie un type avec `/eventtypes add`, retire-le avec `/eventtypes remove`. Les changements apparaissent tout de suite dans le panneau.",
+  "eventtypes.pings": "mentionne {role}",
+  "eventtypes.staff_only_label": "Réservé au staff",
+  "eventtypes.staff_only": "Seul le staff peut créer un groupe **{name}**.",
+  "eventtypes.unknown": "**{name}** ne fait pas partie des types d'événements du serveur. Choisis-en un dans la liste pendant la saisie."
 }

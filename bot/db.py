@@ -14,6 +14,7 @@ import time
 import aiosqlite
 
 from .db_boards import BoardsMixin
+from .db_event_types import EVENT_TYPES_SCHEMA, EventTypesMixin
 from .db_profiles import ProfilesMixin
 
 SCHEMA = """
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS events (
     rsvp_prompt_id INTEGER,                        -- message id of that prompt
     voice_created INTEGER NOT NULL DEFAULT 0,      -- temp voice channel claimed
     voice_channel_id INTEGER,                      -- its channel, NULL once cleaned up
-    groups        INTEGER NOT NULL DEFAULT 1       -- display groups; 1 = single party
+    groups        INTEGER NOT NULL DEFAULT 1,      -- display groups; 1 = single party
+    emoji         TEXT                             -- the event type's emoji when posted
 );
 
 CREATE TABLE IF NOT EXISTS signups (
@@ -182,7 +184,7 @@ CREATE TABLE IF NOT EXISTS applications (
 """
 
 
-class Database(ProfilesMixin, BoardsMixin):
+class Database(ProfilesMixin, BoardsMixin, EventTypesMixin):
     def __init__(self, path: str):
         self.path = path
         self.conn: aiosqlite.Connection | None = None
@@ -195,6 +197,7 @@ class Database(ProfilesMixin, BoardsMixin):
         self.conn.row_factory = aiosqlite.Row
         await self._retire_slot_profiles()
         await self.conn.executescript(SCHEMA)
+        await self.conn.executescript(EVENT_TYPES_SCHEMA)
         await self._add_missing_columns()
         await self._import_slot_profiles()
         await self.conn.commit()
@@ -232,6 +235,7 @@ class Database(ProfilesMixin, BoardsMixin):
                 "voice_created": "INTEGER NOT NULL DEFAULT 0",
                 "voice_channel_id": "INTEGER",
                 "groups": "INTEGER NOT NULL DEFAULT 1",
+                "emoji": "TEXT",  # the event type's emoji when posted
             },
             "recurrences": {
                 "groups": "INTEGER NOT NULL DEFAULT 1",  # siege split, threaded

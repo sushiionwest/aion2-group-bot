@@ -66,6 +66,7 @@ class GroupBot(commands.Bot):
         await self.load_extension("bot.cogs.lfg")
         await self.load_extension("bot.cogs.dashboard")
         await self.load_extension("bot.cogs.panel")
+        await self.load_extension("bot.cogs.event_types")
         await self.load_extension("bot.cogs.onboarding")
         await self.load_extension("bot.cogs.settings")
         await self.load_extension("bot.cogs.recruitment")
