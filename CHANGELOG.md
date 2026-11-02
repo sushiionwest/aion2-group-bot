@@ -6,6 +6,19 @@ All notable changes to Kisk are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Each server's own event types.** `/eventtypes list/add/remove` lets admins
+  edit the list behind the panel's event-type dropdown and `/event`'s type,
+  from Discord. A type can ping a role when a group is created, carry its own
+  emoji, and be staff-only (hidden from and refused to non-moderators). New
+  servers start with the hard-mode dungeons and a staff-only Raid.
+
+### Changed
+
+- **Event posts no longer show the large banner image**, so the channel stays
+  compact. `/event`'s type is now an autocomplete over the server's list.
+
 ### Fixed
 
 - **Newcomer welcome now follows access.** When a server gates access behind a

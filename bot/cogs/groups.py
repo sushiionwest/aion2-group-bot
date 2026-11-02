@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from .. import config, i18n
-from ..actions import post_event, publish_event, resolve_channel
+from ..actions import post_event, publish_event, resolve_channel, type_ping_role
 from ..branding import brand
 from ..embeds import PRESENCE_ACTIVITY_EMOJI, build_rsvp_embed
 from ..errors import resilient_tick
@@ -29,6 +29,19 @@ VOICE_CLEANUP_GRACE = 3 * 60 * 60
 # A recurring event's instance is posted this long before its occurrence, so
 # players have time to sign up.
 RECURRENCE_LEAD = 24 * 60 * 60
+
+
+async def event_type_autocomplete(interaction: discord.Interaction, current: str):
+    """The server's event types matching what's typed so far; staff-only
+    types are only offered to moderators."""
+    db = interaction.client.db
+    is_staff = await member_is_moderator(db, interaction.user)
+    needle = current.casefold()
+    return [
+        app_commands.Choice(name=row["name"], value=row["name"])
+        for row in await db.get_event_types(interaction.guild_id)
+        if (is_staff or not row["staff_only"]) and needle in row["name"].casefold()
+    ][:25]
 
 
 @app_commands.guild_only()
@@ -87,15 +100,6 @@ class Groups(commands.Cog):
         repeat=[
             app_commands.Choice(name="Weekly", value="weekly"),
         ],
-        activity=[
-            app_commands.Choice(name="🏰 Dungeon", value="Dungeon"),
-            app_commands.Choice(name="🐉 Raid", value="Raid"),
-            app_commands.Choice(name="🚩 Battleground", value="Battleground"),
-            app_commands.Choice(name="⚔️ PvP", value="PvP"),
-            app_commands.Choice(name="🌀 Rift", value="Rift"),
-            app_commands.Choice(name="🌌 Abyss", value="Abyss"),
-            app_commands.Choice(name="🎲 Other", value="Other"),
-        ],
         comp=[
             app_commands.Choice(
                 name="Party of 5 — 1 tank / 1 heal / 3 DPS", value="standard5"
@@ -107,11 +111,12 @@ class Groups(commands.Cog):
             app_commands.Choice(name="Open — no role limits", value=COMPO_OPEN),
         ],
     )
+    @app_commands.autocomplete(activity=event_type_autocomplete)
     async def event(
         self,
         interaction: discord.Interaction,
         title: app_commands.Range[str, 1, 100],
-        activity: app_commands.Choice[str],
+        activity: str,
         comp: app_commands.Choice[str],
         when: str | None = None,
         size: app_commands.Range[int, 2, 25] | None = None,
@@ -121,6 +126,15 @@ class Groups(commands.Cog):
         groups: app_commands.Range[int, 2, 8] | None = None,
     ):
         lang = await i18n.resolve_lang(self.bot.db, interaction.guild)
+        # Typed rather than picked from the autocomplete: only the server's
+        # own types are accepted (see /eventtypes).
+        event_type = await self.bot.db.get_event_type(interaction.guild_id, activity)
+        if event_type is None:
+            await interaction.response.send_message(
+                i18n.t("eventtypes.unknown", lang, name=activity), ephemeral=True
+            )
+            return
+        activity = event_type["name"]
         starts_at = None
         if when:
             try:
@@ -157,7 +171,7 @@ class Groups(commands.Cog):
                 interaction,
                 lang,
                 title=title,
-                activity=activity.value,
+                activity=activity,
                 comp_mode=comp_mode,
                 size=party_size,
                 starts_at=starts_at,
@@ -170,7 +184,7 @@ class Groups(commands.Cog):
         await publish_event(
             interaction,
             title=title,
-            activity=activity.value,
+            activity=activity,
             comp_mode=comp_mode,
             size=party_size,
             starts_at=starts_at,
@@ -204,6 +218,11 @@ class Groups(commands.Cog):
                 i18n.t("recurring.needs_time", lang), ephemeral=True
             )
             return
+        if ping is None:
+            ping = type_ping_role(
+                interaction.guild,
+                await self.bot.db.get_event_type(interaction.guild_id, activity),
+            )
         if ping is not None and not ping_permitted(
             is_default_role=ping.is_default(),
             is_moderator=True,  # already a moderator by the check above

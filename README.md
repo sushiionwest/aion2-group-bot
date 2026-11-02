@@ -51,15 +51,30 @@ Like the in-game kisk, it's the **rally point you drop before the fight.**
   * party composition
   * schedule
   * description
-* Supported activity types:
+* Activity types are each server's own list (see below). A new server starts
+  with Krao Cave Hard, Draupnir Hard, Uruguru Hard, Vakron Hard, Shattered
+  Arkanis Stage 4, Dues Research Stage 4 and a staff-only Raid.
 
-  * 🏰 Dungeon
-  * 🐉 Raid
-  * 🚩 Battleground
-  * ⚔️ PvP
-  * 🌀 Rift
-  * 🌌 Abyss
-  * 🎲 Other
+### 🗂️ Your own event types
+
+Admins (Manage Server, or the role set with `/admin-role`) edit the list used by
+the panel's dropdown and `/event`'s type, straight from Discord:
+
+```text
+/eventtypes list
+/eventtypes add name: Fire Temple Hard ping: @FireTemple
+/eventtypes add name: Raid staff_only: True
+/eventtypes remove name: Vakron Hard
+```
+
+* **`ping`**: the role mentioned when a group of that type is created. The
+  role must be mentionable, or Kisk needs the *Mention @everyone, @here, and
+  All Roles* permission.
+* **`staff_only`**: only moderators see and can create that type.
+* **`emoji`**: a normal emoji or a server emoji, shown in the menu and on the
+  event.
+* Running `add` with an existing name edits it; `remove_ping: True` stops its
+  ping. Discord menus hold up to 25 types.
 
 ### 👥 Party compositions
 
@@ -453,11 +468,11 @@ to post a pinned message whose buttons walk members through creating an event
 or reporting an absence **without typing a single command**.
 
 Creating an event takes two steps: the button opens a private message with two
-dropdowns — **event type** (Dungeon, Raid, Battleground, PvP, Rift, Abyss,
-Other) and **party setup** (party of 5, party of 10, or an open party of 5, 10
+dropdowns — **event type** (the server's list, see `/eventtypes`) and
+**party setup** (party of 5, party of 10, or an open party of 5, 10
 or 25) — then **Continue** opens a short form for the title, the time and the
 description. Nothing to spell, nothing to invent: the only free-text type is
-the optional name you can give to an **Other** event.
+the optional name you can give to an **Other** event, if the server has one.
 
 Pair it with `/channels` to keep the panel in its own channel while its results
 land elsewhere:
