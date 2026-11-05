@@ -92,7 +92,7 @@
   "signup.not_signed_up": "You're not signed up for this event.",
   "signup.only_creator_close": "Only the event creator (or a moderator) can close it.",
   "signup.only_creator_cancel": "Only the event creator (or a moderator) can cancel it.",
-  "signup.completed": "🎉 **{title}** completed!",
+  "signup.completed": "✅ **{title}** completed. The listing has been removed.",
   "signup.cancelled": "❌ **{title}** was cancelled by {who}.",
   "signup.promoted": "📣 {mentions}: a spot opened up, you're in the party for **{title}**!",
   "signup.event_gone": "I can't find this event any more (database reset?).",
