@@ -587,16 +587,17 @@ class Groups(commands.Cog):
         now = int(time.time())
         grace = config.EVENT_CLEANUP_HOURS * 3600
         for ev in await self.bot.db.events_to_clean(now, grace):
-            await self._delete_past_event(ev)
+            await self.delete_event_listing(ev)
 
     @cleanup_events.before_loop
     async def _wait_ready_cleanup(self):
         await self.bot.wait_until_ready()
 
-    async def _delete_past_event(self, ev):
-        """Deletes the event's message (and its thread), its RSVP prompt if any,
-        then its row. Best-effort: a missing message or permission is ignored,
-        and the row is dropped regardless so it is not retried forever."""
+    async def delete_event_listing(self, ev):
+        """Deletes the event's message, its RSVP prompt if any, then its row.
+        Used by the cleanup loop and by the Done button. Best-effort: a missing
+        message or permission is ignored, and the row is dropped regardless so
+        it is not retried forever."""
         channel = self.bot.get_channel(ev["channel_id"])
         if channel is not None:
             try:

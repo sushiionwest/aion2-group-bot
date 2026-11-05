@@ -18,6 +18,9 @@ All notable changes to Kisk are documented here. The format follows
 
 - **Event posts no longer show the large banner image**, so the channel stays
   compact. `/event`'s type is now an autocomplete over the server's list.
+- **Done deletes the event.** Pressing Done now removes the listing (and its
+  RSVP prompt and temporary voice channel) instead of posting a "completed"
+  message; only the member who pressed it gets a private confirmation.
 
 ### Fixed
 

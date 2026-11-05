@@ -224,26 +224,17 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             )
             return
 
+        # Completing removes the listing outright: no "completed" post in the
+        # channel, just a private confirmation to whoever pressed Done.
         await db.set_status(event["message_id"], "done")
-        event = await db.get_event(event["message_id"])
-        signups = await db.get_signups(event["message_id"])
-        classes = await db.get_main_classes(
-            event["guild_id"], [s["user_id"] for s in signups]
-        )
-        embed = build_event_embed(event, signups, classes, lang)
-        await interaction.response.edit_message(embed=embed, view=None)
-        # Closing removes the buttons, so no interaction reaches this event's
-        # lock again: drop it rather than leak one lock per event forever.
+        # The message and its buttons are going away, so no interaction reaches
+        # this event's lock again: drop it rather than leak one lock per event.
         self._locks.pop(event["message_id"], None)
-
-        party, _ = assign(event["compo"], event["size"], signups)
-        mentions = join_mentions(s["user_id"] for s in party)
-        await interaction.followup.send(
-            i18n.t("signup.completed", lang, title=event["title"])
-            + (f" GG {mentions}" if mentions else ""),
-            allowed_mentions=discord.AllowedMentions(users=True),
+        await interaction.response.send_message(
+            i18n.t("signup.completed", lang, title=event["title"]), ephemeral=True
         )
         await self._delete_event_voice(interaction, event)
+        await interaction.client.get_cog("Groups").delete_event_listing(event)
 
     @discord.ui.button(
         label="Cancel event",
