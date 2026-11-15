@@ -13,7 +13,7 @@ from .cogs.polls import AvailabilityView, VoteView
 from .cogs.recruitment import ApplyButton, DecisionButton
 from .db import Database
 from .errors import report_error
-from .views import RSVPView, SignupView
+from .views import RetiredButtonsView, RSVPView, SignupView
 
 
 class KiskTranslator(Translator):
@@ -47,6 +47,7 @@ class GroupBot(commands.Bot):
         # Re-register the persistent views so the buttons of already
         # published messages keep working after a restart.
         self.add_view(SignupView())
+        self.add_view(RetiredButtonsView())
         self.add_view(RSVPView())
         self.add_view(VoteView())
         self.add_view(AvailabilityView())

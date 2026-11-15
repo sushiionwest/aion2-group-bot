@@ -55,13 +55,6 @@ EVENT_KEYS = {
     "rsvp.nobody_signed_up": {},
     "rsvp.post_failed": {},
     "rsvp.posted": {"link": "https://x/1"},
-    # cogs/groups.py _send_reminder
-    "reminder.text": {
-        "title": "Fire Temple HM",
-        "link": "https://x/1",
-        "when": "<t:1:R>",
-    },
-    "reminder.nobody": {},
 }
 
 
@@ -89,12 +82,3 @@ def test_events_line_composes_with_waitlist_suffix():
     line += i18n.t("events.waitlist_suffix", "en", n=2)
     assert "Raid" in line
     assert "waitlisted" in line
-
-
-def test_reminder_nobody_composition_reads_naturally():
-    text = i18n.t(
-        "reminder.text", "fr", title="Raid", link="https://x/1", when="bientôt"
-    )
-    full = text + i18n.t("reminder.nobody", "fr")
-    assert "Raid" in full
-    assert "{" not in full

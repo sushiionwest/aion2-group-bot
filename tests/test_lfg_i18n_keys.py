@@ -34,15 +34,6 @@ LFG_KEYS = {
     "lfg.board_refreshed": {"link": "https://discord.com/x"},
     "lfg.board_forbidden": {},
     "lfg.board_posted": {"link": "https://discord.com/x"},
-    "lfg.invite_ping": {
-        "mentions": "<@1>",
-        "emoji": "🏰",
-        "activity": "Dungeon",
-        "link": "https://discord.com/x",
-    },
-    "lfg.invite_none": {},
-    "lfg.invite_full": {},
-    "lfg.invite_forbidden": {},
 }
 
 
