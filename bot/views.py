@@ -7,26 +7,21 @@ published messages stay clickable.
 """
 
 import asyncio
-import io
 import time
 from collections import defaultdict
 
 import discord
 
 from . import config, i18n
-from .embeds import ROLE_EMOJI, ROLE_LABEL, activity_emoji, build_event_embed
+from .embeds import ROLE_EMOJI, ROLE_LABEL, build_event_embed
 from .errors import ViewErrorMixin
 from .logic import (
-    COMPO_STANDARD,
     MOVE_DOWN,
     MOVE_UP,
     assign,
-    missing_slots,
     reorder_priorities,
     signup_priority,
 )
-from .utils.ics import build_calendar
-from .utils.lfg import matching_pool
 from .utils.mentions import join_mentions
 from .utils.permissions import member_is_admin, member_is_moderator
 from .views_common import character_option, refresh_event_message
@@ -130,8 +125,6 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         "aion2:cancel": "signup.btn_cancel",
         "aion2:edit": "signup.btn_edit",
         "aion2:queue": "signup.btn_manage",
-        "aion2:ics": "signup.btn_calendar",
-        "aion2:lfg": "signup.btn_invite_lfg",
     }
 
     def __init__(self, lang: str = "en"):
@@ -175,7 +168,6 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         emoji="🚪",
         style=discord.ButtonStyle.secondary,
         custom_id="aion2:leave",
-        row=1,
     )
     async def leave_button(self, interaction: discord.Interaction, _):
         db = interaction.client.db
@@ -202,9 +194,9 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             await self.announce_promoted(interaction, event, party_before)
 
     @discord.ui.button(
-        label="Done",
+        label="Complete event",
         emoji="✅",
-        style=discord.ButtonStyle.success,
+        style=discord.ButtonStyle.secondary,
         custom_id="aion2:done",
         row=1,
     )
@@ -301,7 +293,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         emoji="✏️",
         style=discord.ButtonStyle.secondary,
         custom_id="aion2:edit",
-        row=2,
+        row=1,
     )
     async def edit_button(self, interaction: discord.Interaction, _):
         db = interaction.client.db
@@ -325,7 +317,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         emoji="🧮",
         style=discord.ButtonStyle.secondary,
         custom_id="aion2:queue",
-        row=2,
+        row=1,
     )
     async def queue_button(self, interaction: discord.Interaction, _):
         db = interaction.client.db
@@ -334,7 +326,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         if event is None:
             return
 
-        # Reordering the queue is a Kisk-admin action.
+        # Managing the queue is a Kisk-admin action.
         if not await member_is_admin(db, interaction.user):
             await interaction.response.send_message(
                 i18n.t("signup.only_admin_manage", lang), ephemeral=True
@@ -342,104 +334,14 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             return
 
         signups = await db.get_signups(event["message_id"])
-        if len(signups) < 2:
+        if not signups:
+            # Sent on its own: a new message can't be given `view=None`.
             await interaction.response.send_message(
                 i18n.t("signup.manage_empty", lang), ephemeral=True
             )
             return
-
         await interaction.response.send_message(
-            i18n.t("signup.manage_intro", lang),
-            view=QueueManageView(event, signups, lang),
-            ephemeral=True,
-        )
-
-    @discord.ui.button(
-        label="Calendar",
-        emoji="📅",
-        style=discord.ButtonStyle.secondary,
-        custom_id="aion2:ics",
-        row=2,
-    )
-    async def ics_button(self, interaction: discord.Interaction, _):
-        db = interaction.client.db
-        lang = await i18n.resolve_lang(db, interaction.guild)
-        events = await db.upcoming_events(interaction.guild_id, int(time.time()))
-        if not any(e["starts_at"] is not None for e in events):
-            await interaction.response.send_message(
-                i18n.t("ics.none", lang), ephemeral=True
-            )
-            return
-        data = build_calendar(events).encode("utf-8")
-        file = discord.File(io.BytesIO(data), filename="kisk-events.ics")
-        await interaction.response.send_message(
-            i18n.t("ics.here", lang), file=file, ephemeral=True
-        )
-
-    @discord.ui.button(
-        label="Invite LFG",
-        emoji="🔎",
-        style=discord.ButtonStyle.secondary,
-        custom_id="aion2:lfg",
-        row=2,
-    )
-    async def invite_lfg_button(self, interaction: discord.Interaction, _):
-        """Pings the LFG pool members who fit an open seat on this event."""
-        db = interaction.client.db
-        lang = await i18n.resolve_lang(db, interaction.guild)
-        event = await self._open_event(interaction)
-        if event is None:
-            return
-
-        is_creator = interaction.user.id == event["creator_id"]
-        if not (is_creator or await member_is_moderator(db, interaction.user)):
-            await interaction.response.send_message(
-                i18n.t("lfg.invite_forbidden", lang), ephemeral=True
-            )
-            return
-
-        signups = await db.get_signups(event["message_id"])
-        party, _waitlist = assign(event["compo"], event["size"], signups)
-        if len(party) >= event["size"]:
-            await interaction.response.send_message(
-                i18n.t("lfg.invite_full", lang), ephemeral=True
-            )
-            return
-
-        # Standard events only want the roles still short; open events take any.
-        if event["compo"] == COMPO_STANDARD:
-            needed = set(missing_slots(event["compo"], event["size"], signups))
-        else:
-            needed = None
-        signed_ids = {s["user_id"] for s in signups}
-        matches = [
-            entry
-            for entry in matching_pool(
-                await db.get_lfg_pool(event["guild_id"], int(time.time())),
-                event["activity"],
-                needed,
-                int(time.time()),
-            )
-            if entry["user_id"] not in signed_ids
-        ]
-        if not matches:
-            await interaction.response.send_message(
-                i18n.t("lfg.invite_none", lang), ephemeral=True
-            )
-            return
-
-        emoji = activity_emoji(event)
-        mentions = join_mentions(entry["user_id"] for entry in matches)
-        await interaction.response.send_message(
-            i18n.t(
-                "lfg.invite_ping",
-                lang,
-                mentions=mentions,
-                emoji=emoji,
-                activity=event["activity"],
-                link=interaction.message.jump_url,
-            ),
-            allowed_mentions=discord.AllowedMentions(users=True),
+            **_queue_panel(event, signups, lang), ephemeral=True
         )
 
     # ----- Shared machinery -----
@@ -630,8 +532,25 @@ def _ranked_signups(signups: list) -> list:
     return sorted(signups, key=signup_priority, reverse=True)
 
 
+def _queue_panel(
+    event, signups: list, lang: str, selected: int | None = None, note: str = ""
+) -> dict:
+    """The admin queue panel as message kwargs (content and view).
+
+    With nobody signed up there is nothing to pick, and Discord rejects a
+    dropdown without options, so the panel then shrinks to a single line.
+    """
+    prefix = f"{note}\n\n" if note else ""
+    if not signups:
+        return {"content": prefix + i18n.t("signup.manage_empty", lang), "view": None}
+    return {
+        "content": prefix + i18n.t("signup.manage_intro", lang),
+        "view": QueueManageView(event, signups, lang, selected=selected),
+    }
+
+
 class QueueSelect(discord.ui.Select):
-    """Picks which sign-up the admin is about to move up or down."""
+    """Picks which sign-up the admin is about to move or remove."""
 
     def __init__(
         self, ranked: list, party_ids: set, selected: int | None, lang: str = "en"
@@ -658,25 +577,28 @@ class QueueSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        self.view.selected = int(self.values[0])
-        signups = await interaction.client.db.get_signups(self.view.event["message_id"])
+        view = self.view
+        signups = await interaction.client.db.get_signups(view.event["message_id"])
         await interaction.response.edit_message(
-            view=QueueManageView(
-                self.view.event, signups, self.view.lang, selected=self.view.selected
-            )
+            **_queue_panel(view.event, signups, view.lang, int(self.values[0]))
         )
 
 
 class QueueManageView(ViewErrorMixin, discord.ui.View):
-    """Admin-only ephemeral controls to reorder an event's sign-up queue.
+    """Admin-only ephemeral controls over an event's sign-up queue.
 
     Short-lived and private to one admin, so no persistence is needed. Moving a
-    sign-up up or down rewrites the stored priorities (see logic.reorder_priorities)
-    and redraws the public event message; anyone this pushes into the party is
-    pinged, exactly like an automatic promotion.
+    sign-up up or down rewrites the stored priorities (see logic.reorder_priorities);
+    removing one takes that member off the event. Either way the public event
+    message is redrawn and anyone this pushes into the party is pinged, exactly
+    like an automatic promotion.
     """
 
-    _BUTTONS = {"queue:up": "signup.btn_up", "queue:down": "signup.btn_down"}
+    _BUTTONS = {
+        "queue:up": "signup.btn_up",
+        "queue:down": "signup.btn_down",
+        "queue:remove": "signup.btn_remove",
+    }
 
     def __init__(
         self, event, signups: list, lang: str = "en", selected: int | None = None
@@ -708,6 +630,33 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
     async def down_button(self, interaction: discord.Interaction, _):
         await self._move(interaction, MOVE_DOWN)
 
+    @discord.ui.button(
+        emoji="🚫", style=discord.ButtonStyle.danger, custom_id="queue:remove", row=1
+    )
+    async def remove_button(self, interaction: discord.Interaction, _):
+        db = interaction.client.db
+        async with SignupView._locks[self.event["message_id"]]:
+            signups = await db.get_signups(self.event["message_id"])
+            target = next((s for s in signups if s["user_id"] == self.selected), None)
+            if target is None:
+                # The picked member left the event meanwhile: just redraw.
+                await interaction.response.edit_message(
+                    **_queue_panel(self.event, signups, self.lang)
+                )
+                return
+
+            party_before, _ = assign(self.event["compo"], self.event["size"], signups)
+            await db.remove_signup(self.event["message_id"], self.selected)
+            signups = await db.get_signups(self.event["message_id"])
+
+            # Answer the interaction first, as in _move.
+            note = i18n.t("signup.removed", self.lang, name=target["display_name"])
+            await interaction.response.edit_message(
+                **_queue_panel(self.event, signups, self.lang, note=note)
+            )
+            await refresh_event_message(interaction.client, self.event)
+            await self._announce_promoted(interaction, party_before, signups)
+
     async def _move(self, interaction: discord.Interaction, direction: str):
         db = interaction.client.db
         async with SignupView._locks[self.event["message_id"]]:
@@ -716,7 +665,7 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
             if self.selected not in ordered_ids:
                 # The picked member left the event meanwhile: just redraw.
                 await interaction.response.edit_message(
-                    view=QueueManageView(self.event, signups, self.lang)
+                    **_queue_panel(self.event, signups, self.lang)
                 )
                 return
 
@@ -728,9 +677,7 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
             # Answer the interaction (redraw the ephemeral panel) before the
             # slower HTTP edit of the public event message.
             await interaction.response.edit_message(
-                view=QueueManageView(
-                    self.event, signups, self.lang, selected=self.selected
-                )
+                **_queue_panel(self.event, signups, self.lang, self.selected)
             )
             await refresh_event_message(interaction.client, self.event)
             await self._announce_promoted(interaction, party_before, signups)
@@ -753,4 +700,31 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
                 title=self.event["title"],
             ),
             allowed_mentions=discord.AllowedMentions(users=True),
+        )
+
+
+class RetiredButtonsView(ViewErrorMixin, discord.ui.View):
+    """Answers the Calendar and Invite LFG buttons left on older listings.
+
+    SignupView no longer has those two buttons, but a listing posted before
+    they were dropped keeps showing them until it is next redrawn. A click on
+    one redraws the listing with the current buttons instead of failing.
+    """
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Calendar", custom_id="aion2:ics")
+    async def ics_button(self, interaction: discord.Interaction, _):
+        await self._redraw(interaction)
+
+    @discord.ui.button(label="Invite LFG", custom_id="aion2:lfg")
+    async def lfg_button(self, interaction: discord.Interaction, _):
+        await self._redraw(interaction)
+
+    async def _redraw(self, interaction: discord.Interaction):
+        lang = await i18n.resolve_lang(interaction.client.db, interaction.guild)
+        await interaction.response.edit_message(view=SignupView(lang))
+        await interaction.followup.send(
+            i18n.t("signup.button_retired", lang), ephemeral=True
         )

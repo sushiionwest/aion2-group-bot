@@ -1,4 +1,4 @@
-"""Slash commands (/event, /events), the reminder loop and the bot status."""
+"""Slash commands (/event, /events), the RSVP prompt loop and the bot status."""
 
 import time
 from datetime import datetime
@@ -46,13 +46,12 @@ async def event_type_autocomplete(interaction: discord.Interaction, current: str
 
 @app_commands.guild_only()
 class Groups(commands.Cog):
-    """Creating and listing events, plus reminders and the bot status."""
+    """Creating and listing events, plus RSVP prompts and the bot status."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     async def cog_load(self):
-        self.reminders.start()
         self.rsvp_prompts.start()
         self.voice_channels.start()
         self.recurring_events.start()
@@ -60,7 +59,6 @@ class Groups(commands.Cog):
         self.status.start()
 
     async def cog_unload(self):
-        self.reminders.cancel()
         self.rsvp_prompts.cancel()
         self.voice_channels.cancel()
         self.recurring_events.cancel()
@@ -71,7 +69,7 @@ class Groups(commands.Cog):
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         """Cancels an event whose message was deleted.
 
-        The reminder / RSVP loops only act on open events; without this, a
+        The RSVP loop only acts on open events; without this, a
         deleted event message would leave its row 'open' and keep pinging the
         party for an event whose message (and buttons) no longer exist.
         """
@@ -391,63 +389,6 @@ class Groups(commands.Cog):
         await self.bot.db.set_rsvp_prompt_id(ev["message_id"], prompt.id)
         await interaction.response.send_message(
             i18n.t("rsvp.posted", lang, link=prompt.jump_url), ephemeral=True
-        )
-
-    # ----- Automatic reminders -----
-
-    @tasks.loop(seconds=60)
-    @resilient_tick
-    async def reminders(self):
-        now = int(time.time())
-        events = await self.bot.db.events_to_remind(now, config.REMINDER_MINUTES * 60)
-        for ev in events:
-            # Atomic claim: skip if it was cancelled/completed (or already
-            # reminded) between the due-query and now.
-            if not await self.bot.db.mark_reminded(ev["message_id"]):
-                continue
-            if ev["starts_at"] < now - 600:
-                # The bot was offline and the event is long past: no point in
-                # sending a late reminder.
-                continue
-            # Re-read as late as possible: a moderator often cancels right
-            # before the start, exactly when this fires, so don't ping a party
-            # for an event that was cancelled after the claim.
-            event = await self.bot.db.get_event(ev["message_id"])
-            if event is None or event["status"] != "open":
-                continue
-            try:
-                await self._send_reminder(event)
-            except discord.HTTPException:
-                pass  # channel deleted or permissions revoked: skip
-
-    @reminders.before_loop
-    async def _wait_ready(self):
-        await self.bot.wait_until_ready()
-
-    async def _send_reminder(self, ev):
-        lang = await i18n.resolve_lang(self.bot.db, self.bot.get_guild(ev["guild_id"]))
-        channel = self.bot.get_channel(ev["channel_id"])
-        if channel is None:
-            channel = await self.bot.fetch_channel(ev["channel_id"])
-        signups = await self.bot.db.get_signups(ev["message_id"])
-        party, _ = assign(ev["compo"], ev["size"], signups)
-        mentions = join_mentions(s["user_id"] for s in party)
-        link = (
-            f"https://discord.com/channels/{ev['guild_id']}"
-            f"/{ev['channel_id']}/{ev['message_id']}"
-        )
-        text = i18n.t(
-            "reminder.text",
-            lang,
-            title=ev["title"],
-            link=link,
-            when=f"<t:{ev['starts_at']}:R>",
-        )
-        await channel.send(
-            text + (f"\n{mentions}" if mentions else i18n.t("reminder.nobody", lang)),
-            # Restrict to the party members: an event titled "@everyone" must not
-            # turn a reminder into a mass ping (the @everyone gate is mods-only).
-            allowed_mentions=discord.AllowedMentions(users=True),
         )
 
     # ----- RSVP prompts ("are you coming?") -----

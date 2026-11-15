@@ -22,6 +22,19 @@ All notable changes to Kisk are documented here. The format follows
   RSVP prompt and temporary voice channel) instead of posting a "completed"
   message; only the member who pressed it gets a private confirmation.
 
+- **Tidier event buttons.** Leave sits on the top row beside Tank / Heal / DPS;
+  Complete event (the former Done, now grey), Cancel event, Edit and Manage
+  queue share the second row.
+- **Manage queue can remove a player** from an event, and opens with a single
+  sign-up.
+
+### Removed
+
+- The **Calendar** and **Invite LFG** buttons on event posts. Older posts that
+  still show them swap to the current buttons on the next click.
+- The reminder message sent 15 minutes before the start. The "are you coming?"
+  prompt is now the only ping ahead of an event.
+
 ### Fixed
 
 - **Newcomer welcome now follows access.** When a server gates access behind a

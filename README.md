@@ -161,11 +161,12 @@ When a spot opens:
 
 No manual reshuffling required.
 
-**Admins can reorder the queue.** A **Manage queue** button on each event
+**Admins can manage the queue.** A **Manage queue** button on each event
 (admins only — Manage Server) opens a private panel listing every sign-up in
 order, marked ✅ *in the party* or ⏳ *waitlisted*. Pick a player and move them
-up or down; the party is recomputed live (per-role slots still respected) and
-anyone pushed into the party is pinged, exactly like an automatic promotion.
+up or down, or **remove** them from the event; the party is recomputed live
+(per-role slots still respected) and anyone pushed into the party is pinged,
+exactly like an automatic promotion.
 
 ### ⏰ Smart schedules
 
@@ -181,15 +182,10 @@ demain 21h
 
 Event times are displayed using **Discord's timezone-aware timestamps**, so every player sees the correct local time.
 
-### 🔔 Automatic reminders
+### 🔔 One ping before the start
 
-Kisk automatically reminds the party before an event starts.
-
-The reminder time is configurable.
-
-Default:
-
-**15 minutes before the event.**
+The party is pinged once ahead of a scheduled event: the **"are you coming?"**
+prompt below. There is no second reminder message after it.
 
 ### 🙋 RSVP — "are you coming?"
 
@@ -215,15 +211,12 @@ Use:
 
 to see upcoming activities with clickable links to their Discord messages.
 
-The **Calendar** button on any event hands you an `.ics` file of the server's
-upcoming scheduled events (privately) — import it into your own calendar app.
-
 ### ✏️ Editing
 
 The event creator or a moderator can edit a posted event with the **Edit**
 button: change the **title**, the **time** or the **description** in a quick
-form (type, composition and size stay fixed). Rescheduling re-arms the reminder
-and the "are you coming?" prompt against the new time and pings the party;
+form (type, composition and size stay fixed). Rescheduling re-arms the
+"are you coming?" prompt against the new time and pings the party;
 clearing the time field drops the schedule.
 
 ### 🎨 Look & feel
@@ -403,9 +396,7 @@ that shows the live pool grouped by activity:
 ```
 
 The board carries **🔎 I'm looking** and **🛑 Stop looking** buttons, so members
-join or leave the pool without a command. And when an event still has an open
-seat, its **Invite LFG** button (creator or moderator) pings the pool members
-who fit a role that's still short.
+join or leave the pool without a command.
 
 **Available now.** For a lighter, activity-agnostic signal, a member can mark
 themselves **✋ available right now** (default 2h) — with the board's **I'm
@@ -430,9 +421,9 @@ among mains). No command to re-run — pin it and it stays current.
 
 When the run is finished, press:
 
-**Done ✅**
+**Complete event ✅**
 
-Kisk sends a GG to the party and archives the event announcement.
+Kisk deletes the event announcement (with its RSVP prompt and voice channel).
 
 ### 🧵 Discussion threads
 
@@ -450,9 +441,9 @@ temporary voice channel:
 /channels voice: <category>
 ```
 
-The channel (**🔊 <event title>**) is created around the reminder window before
+The channel (**🔊 <event title>**) is created shortly before
 the event so the party can gather early, and removed when the event is marked
-**Done** or **cancelled** — with a safety cleanup a few hours after the start in
+**complete** or **cancelled** — with a safety cleanup a few hours after the start in
 case nobody presses Done. It needs the **Manage Channels** permission; without a
 configured category the feature stays off.
 
@@ -900,7 +891,7 @@ bot/
   i18n.py              Per-server language resolution and string catalog
 
   cogs/
-    groups.py           /event, /events, reminders and bot status
+    groups.py           /event, /events, RSVP prompts and bot status
     profiles.py         /profile and /roster
     legion.py           /away, /absences, /back, /announce, /welcome
     polls.py            /vote and /availability

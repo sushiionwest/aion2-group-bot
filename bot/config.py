@@ -21,7 +21,7 @@ GUILD_ID = int(os.getenv("GUILD_ID") or 0)
 # Timezone in which players type their schedules.
 TIMEZONE = ZoneInfo(os.getenv("TIMEZONE", "Europe/Paris"))
 
-# How many minutes before an event's start the reminder is sent.
+# How many minutes before an event's start its temporary voice channel opens.
 REMINDER_MINUTES = int(os.getenv("REMINDER_MINUTES") or 15)
 
 # How many minutes before start the "are you coming?" RSVP prompt is posted.
