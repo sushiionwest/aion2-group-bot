@@ -132,8 +132,24 @@ class SpawnModal(ModalErrorMixin, discord.ui.Modal):
 
         now = int(time.time())
         rows = await db.get_boss_timers(interaction.guild_id)
+        respawn = respawn_seconds(self.timer, rows.get(self.timer.key))
         if seconds is None:
-            seconds = respawn_seconds(self.timer, rows.get(self.timer.key))
+            seconds = respawn
+        elif seconds > respawn:
+            # Most likely minutes:seconds read as hours:minutes. A boss can't
+            # be further away than a full respawn, so refuse rather than store
+            # a timer that is days off.
+            await interaction.response.send_message(
+                i18n.t(
+                    "timers.too_long",
+                    self.lang,
+                    name=self.timer.name,
+                    hours=f"{respawn / 3600:g}",
+                    value=self.countdown.value,
+                ),
+                ephemeral=True,
+            )
+            return
         spawn_at = now + seconds
         await db.set_boss_spawn(
             interaction.guild_id, self.timer.key, spawn_at, interaction.user.id
@@ -197,7 +213,7 @@ def _find_timer(value: str):
 
 @app_commands.guild_only()
 @app_commands.default_permissions(manage_guild=True)
-class Timers(commands.GroupCog, name="timers"):
+class Timers(commands.GroupCog, group_name="timers"):
     """The boss timers board, its settings and its ping loop (admins)."""
 
     def __init__(self, bot: commands.Bot):

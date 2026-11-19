@@ -1,12 +1,14 @@
 """Boss timers: schedule maths, storage, the board and its pings. Run: pytest"""
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import discord
 import pytest
+from discord.ext import commands
 
 from bot import i18n
 from bot.cogs.timers import (
@@ -298,6 +300,85 @@ def test_report_form_fits_discords_limits(lang):
         assert len(field.label) <= 45 and len(field.placeholder) <= 100
 
 
+def _submit(tmp_path, typed: str, key: str = "dartan"):
+    """Submits the report form for one boss and returns what happened."""
+
+    async def go():
+        db = Database(str(tmp_path / "form.db"))
+        await db.connect()
+        try:
+            bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())
+            bot.db = db
+            # Added the way discord.py does, so the form finds it by its real
+            # name. The background loop needs a logged-in client: not started.
+            cog = Timers(bot)
+            cog.cog_load = _noop
+            await bot.add_cog(cog)
+            calls = []
+
+            async def edit_message(**kwargs):
+                calls.append(("edit", kwargs))
+
+            async def send_message(content, **kwargs):
+                calls.append(("reply", content))
+
+            async def followup(content, **kwargs):
+                calls.append(("followup", content))
+
+            interaction = SimpleNamespace(
+                client=bot,
+                guild=SimpleNamespace(id=1),
+                guild_id=1,
+                user=SimpleNamespace(id=77),
+                response=SimpleNamespace(
+                    edit_message=edit_message, send_message=send_message
+                ),
+                followup=SimpleNamespace(send=followup),
+            )
+            modal = SpawnModal(TIMERS_BY_KEY[key], "en")
+            modal.countdown._value = typed
+            before = int(time.time())
+            await modal.on_submit(interaction)
+            row = (await db.get_boss_timers(1)).get(key)
+            await bot.close()
+            return calls, row, before
+        finally:
+            await db.close()
+
+    return asyncio.run(go())
+
+
+async def _noop():
+    return None
+
+
+def test_reporting_a_countdown_saves_it_and_redraws_the_board(tmp_path):
+    calls, row, before = _submit(tmp_path, "2:30")
+    assert [kind for kind, _ in calls] == ["edit", "followup"]
+    assert 0 <= row["spawn_at"] - before - 9000 <= 5
+    assert row["set_by"] == 77
+    assert f"<t:{row['spawn_at']}:R>" in calls[0][1]["embed"].description
+    assert "<@77>" in calls[0][1]["embed"].description
+
+
+def test_an_empty_report_means_killed_just_now(tmp_path):
+    calls, row, before = _submit(tmp_path, "")
+    assert [kind for kind, _ in calls] == ["edit", "followup"]
+    assert 0 <= row["spawn_at"] - before - 6 * 3600 <= 5  # Dartan: 6 hours
+
+
+def test_a_countdown_longer_than_the_respawn_is_refused(tmp_path):
+    # 42:10 on a 6-hour boss is minutes:seconds, not 42 hours.
+    calls, row, _ = _submit(tmp_path, "42:10")
+    assert [kind for kind, _ in calls] == ["reply"]
+    assert "42:10" in calls[0][1] and row is None
+
+
+def test_an_unreadable_countdown_is_refused(tmp_path):
+    calls, row, _ = _submit(tmp_path, "soon")
+    assert [kind for kind, _ in calls] == ["reply"] and row is None
+
+
 # ----- Pings -----
 
 
@@ -367,6 +448,7 @@ TIMER_KEYS = {
     "timers.modal_label": {},
     "timers.modal_placeholder": {},
     "timers.bad_time": {"value": "soon"},
+    "timers.too_long": {"name": "Gartua", "hours": "11", "value": "42:10"},
     "timers.saved": {"name": "Gartua", "when": "<t:1:R>"},
     "timers.ping": {"names": "Gartua", "when": "<t:1:R>"},
     "timers.admin_only": {},

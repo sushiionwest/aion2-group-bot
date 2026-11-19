@@ -366,6 +366,7 @@
   "timers.modal_label": "Temps avant l'apparition",
   "timers.modal_placeholder": "5:42 = 5 h 42 min, comme en jeu. Laisse vide s'il vient d'être tué.",
   "timers.bad_time": "Je n'ai pas compris `{value}`. Saisis le compte à rebours de la liste des boss en jeu, par exemple `5:42` (heures:minutes), ou laisse vide si le boss vient d'être tué.",
+  "timers.too_long": "**{name}** réapparaît {hours} h après sa mort, donc `{value}` est trop long. Je lis `5:42` comme 5 heures 42 minutes ; pour 42 minutes, saisis `0:42` ou `42m`.",
   "timers.saved": "**{name}** apparaît {when}. Merci !",
   "timers.ping": "⏰ **{names}** — {when}",
   "timers.admin_only": "Seul un admin Kisk peut gérer les timers des boss.",

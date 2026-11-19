@@ -366,6 +366,7 @@
   "timers.modal_label": "Time until it spawns",
   "timers.modal_placeholder": "5:42 = 5 h 42 min, as shown in game. Leave empty if it was just killed.",
   "timers.bad_time": "I couldn't read `{value}`. Type the countdown from the in-game Field Boss list, like `5:42` (hours:minutes), or leave it empty if the boss was just killed.",
+  "timers.too_long": "**{name}** respawns {hours} h after a kill, so `{value}` is too long. I read `5:42` as 5 hours 42 minutes; for 42 minutes type `0:42` or `42m`.",
   "timers.saved": "**{name}** spawns {when}. Thanks!",
   "timers.ping": "⏰ **{names}** — {when}",
   "timers.admin_only": "Only a Kisk admin can manage the boss timers.",
