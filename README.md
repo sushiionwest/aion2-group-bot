@@ -417,6 +417,33 @@ the **LFG pool** and **available now** counts, current **absences**, active
 **recurring series**, and **roster health** (members and the tank/heal/DPS split
 among mains). No command to re-run — pin it and it stays current.
 
+### ⏱️ Boss timers
+
+`/timers post` (admins) puts a live **boss timers** board in a channel:
+
+* **Field bosses** (Gartua, Lagta, Dartan, Kashapa) respawn a set time after
+  each kill, which only players see. Anyone taps a boss's button under the
+  board and types the countdown from the in-game Field Boss list (`5:42`), or
+  leaves it empty when the boss was just killed. The board shows who set it.
+* **Abyss bosses** and the **Spacetime Rift** follow the game server's clock,
+  so Kisk works their times out on its own.
+
+Every time is a Discord timestamp, so each member reads it in their own
+timezone.
+
+**Pings.** `/timers role timer: role:` attaches a role to a timer. Kisk pings
+it 5 minutes before the spawn and deletes the ping about 5 minutes later, so
+the channel stays clean.
+
+**Settings** (admins):
+
+* `/timers settings timezone: ping_minutes:` sets the game server's clock
+  (default `America/Los_Angeles`) and the ping lead time; with no option it
+  shows the current setup.
+* `/timers respawn boss: hours:` changes a field boss's respawn time.
+* `/timers schedule timer: days: times:` changes a clock timer, e.g.
+  `mon,thu,sat` and `21:30`, or `daily` and `01:00/3h`.
+
 ### ✅ Event completion
 
 When the run is finished, press:
