@@ -16,6 +16,7 @@ import aiosqlite
 from .db_boards import BoardsMixin
 from .db_event_types import EVENT_TYPES_SCHEMA, EventTypesMixin
 from .db_profiles import ProfilesMixin
+from .db_timers import TIMERS_SCHEMA, TimersMixin
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -184,7 +185,7 @@ CREATE TABLE IF NOT EXISTS applications (
 """
 
 
-class Database(ProfilesMixin, BoardsMixin, EventTypesMixin):
+class Database(ProfilesMixin, BoardsMixin, EventTypesMixin, TimersMixin):
     def __init__(self, path: str):
         self.path = path
         self.conn: aiosqlite.Connection | None = None
@@ -198,6 +199,7 @@ class Database(ProfilesMixin, BoardsMixin, EventTypesMixin):
         await self._retire_slot_profiles()
         await self.conn.executescript(SCHEMA)
         await self.conn.executescript(EVENT_TYPES_SCHEMA)
+        await self.conn.executescript(TIMERS_SCHEMA)
         await self._add_missing_columns()
         await self._import_slot_profiles()
         await self.conn.commit()

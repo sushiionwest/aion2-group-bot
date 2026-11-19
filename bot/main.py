@@ -11,6 +11,7 @@ from .cogs.onboarding import OnboardButton
 from .cogs.panel import PanelView
 from .cogs.polls import AvailabilityView, VoteView
 from .cogs.recruitment import ApplyButton, DecisionButton
+from .cogs.timers import TimersBoardView
 from .db import Database
 from .errors import report_error
 from .views import RetiredButtonsView, RSVPView, SignupView
@@ -53,6 +54,7 @@ class GroupBot(commands.Bot):
         self.add_view(AvailabilityView())
         self.add_view(PanelView())
         self.add_view(LfgBoardView())
+        self.add_view(TimersBoardView())
 
         # The onboarding DM button carries its guild id in the custom_id, so it
         # is registered as a dynamic item rather than a fixed persistent view.
@@ -68,6 +70,7 @@ class GroupBot(commands.Bot):
         await self.load_extension("bot.cogs.dashboard")
         await self.load_extension("bot.cogs.panel")
         await self.load_extension("bot.cogs.event_types")
+        await self.load_extension("bot.cogs.timers")
         await self.load_extension("bot.cogs.onboarding")
         await self.load_extension("bot.cogs.settings")
         await self.load_extension("bot.cogs.recruitment")
