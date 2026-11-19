@@ -28,6 +28,9 @@ UP_WINDOW_S = 3600
 # times, assuming a kill right at each spawn. Every real kill comes a little
 # later than that, so the guess drifts; past this it is dropped as unknown.
 MAX_ESTIMATED_RESPAWNS = 2
+# A spawn this close to the one last pinged for is the same spawn with a
+# corrected time (a member's report replacing an estimate): no second ping.
+SAME_SPAWN_S = 30 * 60
 # The longest countdown a member can enter.
 MAX_COUNTDOWN_S = 48 * 3600
 
@@ -241,6 +244,7 @@ def due_pings(rows: dict, now_ts: int, tz: ZoneInfo, lead_s: int) -> list:
         spawn = timer_state(timer, row, now_ts, tz).next_at
         if spawn is None or spawn - now_ts > lead_s:
             continue
-        if row["pinged_for"] != spawn:
+        pinged = row["pinged_for"]
+        if pinged is None or abs(spawn - pinged) >= SAME_SPAWN_S:
             due.append((timer, spawn))
     return due

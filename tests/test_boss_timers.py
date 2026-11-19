@@ -261,6 +261,21 @@ def test_defaults_apply_before_a_server_sets_anything():
     assert board_timezone({"timezone": "Not/AZone"}).key == "America/Los_Angeles"
 
 
+def test_clearing_wipes_the_report_but_keeps_the_role(tmp_path):
+    async def steps(db):
+        await db.set_boss_timer_config(1, "gartua", role_id=55)
+        await db.set_boss_spawn(1, "gartua", 5000, 9)
+        await db.set_boss_spawn(1, "lagta", 6000, 9)
+        await db.clear_boss_spawns(1, ["gartua", "dartan"])  # dartan: no row yet
+        return await db.get_boss_timers(1)
+
+    rows = _run(tmp_path, steps)
+    assert (rows["gartua"]["spawn_at"], rows["gartua"]["set_by"]) == (None, None)
+    assert rows["gartua"]["role_id"] == 55
+    assert rows["lagta"]["spawn_at"] == 6000
+    assert "dartan" not in rows
+
+
 def test_ping_messages_are_swept_when_due(tmp_path):
     async def steps(db):
         await db.add_timer_ping(1, 10, 100)
@@ -303,8 +318,8 @@ def test_board_marks_restarted_field_boss_times_as_estimates():
     field = build_timers_embed(rows, SGT, "en", SEEN).fields[0].value
     dartan, gartua, lagta = SEEN + 4 * HOUR, SEEN - 60, SEEN - 60
     assert f"**Dartan** · ≈ <t:{dartan}:R> · <t:{dartan}:t>" in field
-    assert f"**Gartua** · 🟢 up since <t:{gartua}:R> · next ≈ " in field
-    assert f"**Lagta** · 🟡 likely up since <t:{lagta}:R>" in field
+    assert f"**Gartua** · 🟢 spawned <t:{gartua}:R> · next ≈ " in field
+    assert f"**Lagta** · 🟡 expected <t:{lagta}:R>" in field
     assert "≈" in build_timers_embed(rows, SGT, "en", SEEN).footer.text
 
 
@@ -479,6 +494,15 @@ def test_due_pings_are_sent_once_grouped_and_cleaned_up(tmp_path):
     assert kept == [] and deleted == [901]
 
 
+def test_a_corrected_time_for_the_same_spawn_does_not_ping_again():
+    # Pinged for the estimate; a member then enters the real time, 4 min later.
+    rows = {"dartan": _row(role_id=1, spawn_at=SEEN + 240, pinged_for=SEEN)}
+    assert due_pings(rows, SEEN, SGT, 300) == []
+    # The following respawn, hours later, pings as usual.
+    rows = {"dartan": _row(role_id=1, spawn_at=SEEN + 6 * HOUR, pinged_for=SEEN)}
+    assert len(due_pings(rows, SEEN + 6 * HOUR - 60, SGT, 300)) == 1
+
+
 def test_a_ping_for_a_restarted_timer_says_it_is_an_estimate(tmp_path):
     async def steps(db):
         channel = _Channel()
@@ -525,6 +549,7 @@ TIMER_KEYS = {
     "timers.role_cleared": {"name": "Gartua"},
     "timers.no_everyone": {},
     "timers.respawn_set": {"name": "Gartua", "hours": "11"},
+    "timers.cleared": {"name": "Gartua"},
     "timers.respawn_label": {"hours": "11"},
     "timers.bad_schedule": {},
     "timers.schedule_set": {"name": "Nahma", "schedule": "fri,sun 21:00"},

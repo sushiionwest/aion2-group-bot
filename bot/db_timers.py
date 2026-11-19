@@ -114,6 +114,16 @@ class TimersMixin:
         )
         await self.conn.commit()
 
+    async def clear_boss_spawns(self, guild_id: int, keys) -> None:
+        """Forgets the reported spawn of the given field bosses."""
+        for key in keys:
+            await self.conn.execute(
+                "UPDATE boss_timers SET spawn_at = NULL, set_by = NULL "
+                "WHERE guild_id = ? AND key = ?",
+                (guild_id, key),
+            )
+        await self.conn.commit()
+
     async def set_boss_timer_config(self, guild_id: int, key: str, **changes) -> None:
         """Sets role_id, respawn_minutes and/or schedule (None clears one)."""
         unknown = set(changes) - set(_CONFIG_COLUMNS)

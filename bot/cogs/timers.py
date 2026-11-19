@@ -378,6 +378,35 @@ class Timers(commands.GroupCog, group_name="timers"):
         )
 
     @app_commands.command(
+        name="clear",
+        description="Wipe a field boss's timer, e.g. after maintenance (admins)",
+    )
+    @app_commands.describe(boss="The field boss to reset")
+    @app_commands.choices(
+        boss=[
+            app_commands.Choice(name="All field bosses", value="all"),
+            *[app_commands.Choice(name=t.name, value=t.key) for t in FIELD_TIMERS],
+        ]
+    )
+    async def clear(
+        self, interaction: discord.Interaction, boss: app_commands.Choice[str]
+    ):
+        db = self.bot.db
+        lang = await i18n.resolve_lang(db, interaction.guild)
+        if await self._refuse_non_admin(interaction, lang):
+            return
+        keys = (
+            [timer.key for timer in FIELD_TIMERS]
+            if boss.value == "all"
+            else [boss.value]
+        )
+        await db.clear_boss_spawns(interaction.guild_id, keys)
+        await interaction.response.send_message(
+            i18n.t("timers.cleared", lang, name=boss.name), ephemeral=True
+        )
+        await self._redraw(interaction.guild)
+
+    @app_commands.command(
         name="schedule",
         description="Change when a clock-based boss or event spawns (admins)",
     )

@@ -444,6 +444,8 @@ the channel stays clean.
   (default `America/Los_Angeles`) and the ping lead time; with no option it
   shows the current setup.
 * `/timers respawn boss: hours:` changes a field boss's respawn time.
+* `/timers clear boss:` wipes one field boss's timer, or all of them (after a
+  maintenance, say).
 * `/timers schedule timer: days: times:` changes a clock timer, e.g.
   `mon,thu,sat` and `21:30`, or `daily` and `01:00/3h`.
 
