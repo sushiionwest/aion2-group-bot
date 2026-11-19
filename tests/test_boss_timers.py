@@ -54,7 +54,7 @@ def _state(key, now=SEEN, tz=SGT, row=None):
 def test_clock_timers_match_the_countdowns_seen_on_the_existing_embed():
     assert _state("watcher_kaira").next_at - SEEN == 92 * 60  # "in 2 hours"
     assert _state("executor_tamasa").next_at - SEEN == 13 * 3600 + 2 * 60
-    assert _state("dramos").next_at == _state("executor_argo").next_at
+    assert _state("executor_kaira").next_at == _state("executor_argo").next_at
     assert _state("nahma").next_at - SEEN == 36 * 3600 + 32 * 60  # "in 2 days"
     rift = _state("rift")
     assert rift.live_until - SEEN == 32 * 60  # "LIVE, ends in 32 minutes"

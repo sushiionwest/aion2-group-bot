@@ -50,9 +50,6 @@ TIMERS = (
     TimerDef("executor_tamasa", "Executor Tamasa", "abyss", schedule=_EXECUTORS),
     TimerDef("executor_argo", "Executor Argo", "abyss", schedule=_EXECUTORS),
     TimerDef("executor_kaira", "Executor Kaira", "abyss", schedule=_EXECUTORS),
-    TimerDef("dramos", "Executioner Dramos", "abyss", schedule=_EXECUTORS),
-    TimerDef("ducal", "Turncoat Ducal", "abyss", schedule=_EXECUTORS),
-    TimerDef("marakha", "Ravager Marakha", "abyss", schedule=_EXECUTORS),
     TimerDef("nahma", "Guardian Lord Nahma", "abyss", schedule=_NAHMA),
     TimerDef("enraged_nahma", "Enraged Guardian Lord Nahma", "abyss", schedule=_NAHMA),
     TimerDef(
