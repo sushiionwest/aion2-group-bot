@@ -25,6 +25,7 @@ from bot.utils.boss_timers import (
     TIMERS,
     TIMERS_BY_KEY,
     UP_WINDOW_S,
+    TimerState,
     due_pings,
     last_start,
     next_start,
@@ -134,16 +135,44 @@ def test_bad_countdowns_are_refused(text):
         parse_countdown(text)
 
 
-def test_a_field_boss_goes_from_unknown_to_counting_to_up_to_unknown():
+HOUR = 3600
+
+
+def test_a_field_boss_counts_down_to_its_reported_spawn_then_reads_up():
     row = {"spawn_at": SEEN + 600, "set_by": 7, "respawn_minutes": None}
-    assert _state("gartua") == timer_state(TIMERS_BY_KEY["gartua"], None, SEEN, SGT)
-    assert _state("gartua").next_at is None
-    counting = _state("gartua", row=row)
+    assert _state("dartan") == TimerState()  # nothing reported yet
+    counting = _state("dartan", row=row)
     assert (counting.next_at, counting.set_by) == (SEEN + 600, 7)
-    up = _state("gartua", now=SEEN + 900, row=row)
-    assert (up.next_at, up.up_since) == (None, SEEN + 600)
-    stale = _state("gartua", now=SEEN + 600 + UP_WINDOW_S + 1, row=row)
-    assert stale.up_since is None and stale.next_at is None
+    assert not counting.next_estimated
+    up = _state("dartan", now=SEEN + 900, row=row)
+    assert (up.up_since, up.up_estimated) == (SEEN + 600, False)
+    # The spawn after it is already known, as an estimate: Dartan takes 6 h.
+    assert (up.next_at, up.next_estimated) == (SEEN + 600 + 6 * HOUR, True)
+
+
+def test_a_field_boss_timer_restarts_on_its_own_as_an_estimate():
+    spawn = SEEN
+    row = {"spawn_at": spawn, "set_by": 7, "respawn_minutes": None}
+    # Past the "up" window it counts down to the next spawn, marked estimated.
+    waiting = _state("dartan", now=spawn + UP_WINDOW_S + 1, row=row)
+    assert (waiting.up_since, waiting.next_at) == (None, spawn + 6 * HOUR)
+    assert waiting.next_estimated and waiting.set_by == 7
+    # At that estimated spawn it reads "likely up", and counts to the one after.
+    again = _state("dartan", now=spawn + 6 * HOUR + 60, row=row)
+    assert (again.up_since, again.up_estimated) == (spawn + 6 * HOUR, True)
+    assert again.next_at == spawn + 12 * HOUR
+    # Two restarts is as far as a guess goes: after that it is unknown.
+    last = _state("dartan", now=spawn + 12 * HOUR + 60, row=row)
+    assert (last.up_since, last.next_at) == (spawn + 12 * HOUR, None)
+    assert _state("dartan", now=spawn + 12 * HOUR + UP_WINDOW_S + 1, row=row) == (
+        TimerState()
+    )
+
+
+def test_a_custom_respawn_time_drives_the_restart():
+    row = {"spawn_at": SEEN, "set_by": 7, "respawn_minutes": 12 * 60}
+    state = _state("gartua", now=SEEN + UP_WINDOW_S + 1, row=row)
+    assert state.next_at == SEEN + 12 * HOUR
 
 
 def _row(**values):
@@ -263,6 +292,20 @@ def test_board_lists_every_timer_with_discord_timestamps(lang):
     assert f"<t:{nahma}:R> · <t:{nahma}:d> <t:{nahma}:t>" in text
     assert all(len(field.value) <= 1024 for field in embed.fields)
     assert "{" not in embed.footer.text
+
+
+def test_board_marks_restarted_field_boss_times_as_estimates():
+    rows = {
+        "dartan": _row(spawn_at=SEEN - 2 * HOUR, set_by=42),  # past the up window
+        "gartua": _row(spawn_at=SEEN - 60, set_by=42),  # just spawned
+        "lagta": _row(spawn_at=SEEN - 11 * HOUR - 60, set_by=42),  # one restart ago
+    }
+    field = build_timers_embed(rows, SGT, "en", SEEN).fields[0].value
+    dartan, gartua, lagta = SEEN + 4 * HOUR, SEEN - 60, SEEN - 60
+    assert f"**Dartan** · ≈ <t:{dartan}:R> · <t:{dartan}:t>" in field
+    assert f"**Gartua** · 🟢 up since <t:{gartua}:R> · next ≈ " in field
+    assert f"**Lagta** · 🟡 likely up since <t:{lagta}:R>" in field
+    assert "≈" in build_timers_embed(rows, SGT, "en", SEEN).footer.text
 
 
 def test_board_is_unchanged_until_a_timer_rolls_over():
@@ -436,6 +479,25 @@ def test_due_pings_are_sent_once_grouped_and_cleaned_up(tmp_path):
     assert kept == [] and deleted == [901]
 
 
+def test_a_ping_for_a_restarted_timer_says_it_is_an_estimate(tmp_path):
+    async def steps(db):
+        channel = _Channel()
+        bot = SimpleNamespace(
+            db=db, get_channel=lambda _id: channel, get_guild=lambda _id: None
+        )
+        cog = Timers(bot)
+        await db.set_timer_board(1, channel.id, 30)
+        await db.set_boss_timer_config(1, "dartan", role_id=71)
+        await db.set_boss_timer_config(1, "kashapa", role_id=72)
+        await db.set_boss_spawn(1, "dartan", SEEN - 6 * HOUR + 120, 9)  # restarted
+        await db.set_boss_spawn(1, "kashapa", SEEN + 120, 9)  # as reported
+        await cog._send_pings(await db.get_timer_board(1), SEEN)
+        return channel.sent
+
+    ((content, _),) = _run(tmp_path, steps)
+    assert "≈ Dartan, Kashapa" in content
+
+
 TIMER_KEYS = {
     "timers.title": {},
     "timers.group_field": {},
@@ -443,6 +505,8 @@ TIMER_KEYS = {
     "timers.group_rift": {},
     "timers.live": {"when": "<t:1:R>"},
     "timers.up_since": {"when": "<t:1:R>"},
+    "timers.up_estimated": {"when": "<t:1:R>"},
+    "timers.next_estimate": {"when": "<t:1:t>"},
     "timers.unknown": {},
     "timers.set_by": {"who": "<@1>"},
     "timers.footer": {"clock": "PST"},

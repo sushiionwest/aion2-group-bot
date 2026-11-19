@@ -425,6 +425,9 @@ among mains). No command to re-run — pin it and it stays current.
   each kill, which only players see. Anyone taps a boss's button under the
   board and types the countdown from the in-game Field Boss list (`5:42`), or
   leaves it empty when the boss was just killed. The board shows who set it.
+  Once that spawn passes, the timer restarts on its own as an estimate (marked
+  `≈`), assuming the boss died as it spawned; a new report replaces the guess.
+  After two unreported respawns the timer goes back to "not set".
 * **Abyss bosses** and the **Spacetime Rift** follow the game server's clock,
   so Kisk works their times out on its own.
 
