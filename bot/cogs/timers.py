@@ -66,22 +66,25 @@ def local_time(ts: int, now: int) -> str:
 
 def _timer_line(timer, state, lang: str, now: int) -> str:
     if state.live_until is not None:
-        status = i18n.t("timers.live", lang, when=f"<t:{state.live_until}:R>")
+        parts = [i18n.t("timers.live", lang, when=f"<t:{state.live_until}:R>")]
     elif state.up_since is not None:
-        status = i18n.t("timers.up_since", lang, when=f"<t:{state.up_since}:R>")
+        parts = [i18n.t("timers.up_since", lang, when=f"<t:{state.up_since}:R>")]
     elif state.next_at is not None:
-        status = f"<t:{state.next_at}:R> ({local_time(state.next_at, now)})"
+        parts = [f"<t:{state.next_at}:R>", local_time(state.next_at, now)]
     else:
-        status = i18n.t("timers.unknown", lang)
+        parts = [i18n.t("timers.unknown", lang)]
     if state.set_by is not None:
-        status += " · " + i18n.t("timers.set_by", lang, who=f"<@{state.set_by}>")
-    return f"**{timer.name}** — {status}"
+        parts.append(i18n.t("timers.set_by", lang, who=f"<@{state.set_by}>"))
+    return f"**{timer.name}** · " + " · ".join(parts)
 
 
 def build_timers_embed(rows: dict, tz: ZoneInfo, lang: str, now: int) -> discord.Embed:
-    """The board. Countdowns are Discord timestamps, so they tick on their own
-    and the message only needs an edit when a timer rolls over."""
-    sections = []
+    """The board: one section per group, one line per timer. Countdowns are
+    Discord timestamps, so they tick on their own and the message only needs
+    an edit when a timer rolls over."""
+    embed = discord.Embed(
+        title="⏱️ " + i18n.t("timers.title", lang), colour=discord.Colour.blurple()
+    )
     for group in GROUPS:
         lines = [
             _timer_line(
@@ -90,13 +93,11 @@ def build_timers_embed(rows: dict, tz: ZoneInfo, lang: str, now: int) -> discord
             for timer in TIMERS
             if timer.group == group
         ]
-        title = f"{GROUP_EMOJI[group]} **{i18n.t(f'timers.group_{group}', lang)}**"
-        sections.append("\n".join([title, *lines]))
-    embed = discord.Embed(
-        title=i18n.t("timers.title", lang),
-        description="\n\n".join(sections),
-        colour=discord.Colour.blurple(),
-    )
+        embed.add_field(
+            name=f"{GROUP_EMOJI[group]} {i18n.t(f'timers.group_{group}', lang)}",
+            value="\n".join(lines),
+            inline=False,
+        )
     brand(embed)
     clock = datetime.fromtimestamp(now, tz).strftime("%Z")
     embed.set_footer(text=i18n.t("timers.footer", lang, clock=clock))

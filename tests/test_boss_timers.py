@@ -54,7 +54,7 @@ def _state(key, now=SEEN, tz=SGT, row=None):
 def test_clock_timers_match_the_countdowns_seen_on_the_existing_embed():
     assert _state("watcher_kaira").next_at - SEEN == 92 * 60  # "in 2 hours"
     assert _state("executor_tamasa").next_at - SEEN == 13 * 3600 + 2 * 60
-    assert _state("dramos").next_at == _state("executor_argo").next_at
+    assert _state("executor_kaira").next_at == _state("executor_argo").next_at
     assert _state("nahma").next_at - SEEN == 36 * 3600 + 32 * 60  # "in 2 days"
     rift = _state("rift")
     assert rift.live_until - SEEN == 32 * 60  # "LIVE, ends in 32 minutes"
@@ -250,17 +250,18 @@ def test_ping_messages_are_swept_when_due(tmp_path):
 def test_board_lists_every_timer_with_discord_timestamps(lang):
     rows = {"gartua": _row(spawn_at=SEEN + 3600, set_by=42)}
     embed = build_timers_embed(rows, SGT, lang, SEEN)
-    text = embed.description
+    assert [field.inline for field in embed.fields] == [False, False, False]
+    text = "\n".join(f"{field.name}\n{field.value}" for field in embed.fields)
     for timer in TIMERS:
         assert f"**{timer.name}**" in text
     # Field bosses first, then the abyss, then the rift.
     assert text.index("Gartua") < text.index("Watcher Kaira") < text.index("Rift")
-    assert f"<t:{SEEN + 3600}:R> (<t:{SEEN + 3600}:t>)" in text
+    assert f"<t:{SEEN + 3600}:R> · <t:{SEEN + 3600}:t>" in text
     assert "<@42>" in text
     assert i18n.t("timers.unknown", lang) in text  # Lagta, Dartan, Kashapa
     nahma = _state("nahma").next_at
-    assert f"<t:{nahma}:R> (<t:{nahma}:d> <t:{nahma}:t>)" in text
-    assert len(text) <= 4096
+    assert f"<t:{nahma}:R> · <t:{nahma}:d> <t:{nahma}:t>" in text
+    assert all(len(field.value) <= 1024 for field in embed.fields)
     assert "{" not in embed.footer.text
 
 
@@ -357,8 +358,9 @@ def test_reporting_a_countdown_saves_it_and_redraws_the_board(tmp_path):
     assert [kind for kind, _ in calls] == ["edit", "followup"]
     assert 0 <= row["spawn_at"] - before - 9000 <= 5
     assert row["set_by"] == 77
-    assert f"<t:{row['spawn_at']}:R>" in calls[0][1]["embed"].description
-    assert "<@77>" in calls[0][1]["embed"].description
+    field_bosses = calls[0][1]["embed"].fields[0].value
+    assert f"<t:{row['spawn_at']}:R>" in field_bosses
+    assert "<@77>" in field_bosses
 
 
 def test_an_empty_report_means_killed_just_now(tmp_path):
