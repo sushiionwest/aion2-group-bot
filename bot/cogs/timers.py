@@ -68,7 +68,13 @@ def _timer_line(timer, state, lang: str, now: int) -> str:
     if state.live_until is not None:
         parts = [i18n.t("timers.live", lang, when=f"<t:{state.live_until}:R>")]
     elif state.up_since is not None:
-        parts = [i18n.t("timers.up_since", lang, when=f"<t:{state.up_since}:R>")]
+        key = "timers.up_estimated" if state.up_estimated else "timers.up_since"
+        parts = [i18n.t(key, lang, when=f"<t:{state.up_since}:R>")]
+        if state.next_at is not None:
+            when = local_time(state.next_at, now)
+            parts.append(i18n.t("timers.next_estimate", lang, when=when))
+    elif state.next_estimated:
+        parts = [f"≈ <t:{state.next_at}:R>", local_time(state.next_at, now)]
     elif state.next_at is not None:
         parts = [f"<t:{state.next_at}:R>", local_time(state.next_at, now)]
     else:
@@ -372,6 +378,35 @@ class Timers(commands.GroupCog, group_name="timers"):
         )
 
     @app_commands.command(
+        name="clear",
+        description="Wipe a field boss's timer, e.g. after maintenance (admins)",
+    )
+    @app_commands.describe(boss="The field boss to reset")
+    @app_commands.choices(
+        boss=[
+            app_commands.Choice(name="All field bosses", value="all"),
+            *[app_commands.Choice(name=t.name, value=t.key) for t in FIELD_TIMERS],
+        ]
+    )
+    async def clear(
+        self, interaction: discord.Interaction, boss: app_commands.Choice[str]
+    ):
+        db = self.bot.db
+        lang = await i18n.resolve_lang(db, interaction.guild)
+        if await self._refuse_non_admin(interaction, lang):
+            return
+        keys = (
+            [timer.key for timer in FIELD_TIMERS]
+            if boss.value == "all"
+            else [boss.value]
+        )
+        await db.clear_boss_spawns(interaction.guild_id, keys)
+        await interaction.response.send_message(
+            i18n.t("timers.cleared", lang, name=boss.name), ephemeral=True
+        )
+        await self._redraw(interaction.guild)
+
+    @app_commands.command(
         name="schedule",
         description="Change when a clock-based boss or event spawns (admins)",
     )
@@ -547,10 +582,18 @@ class Timers(commands.GroupCog, group_name="timers"):
         lang = await i18n.resolve_lang(db, self.bot.get_guild(guild_id))
         for spawn, timers in by_spawn.items():
             roles = dict.fromkeys(rows[timer.key]["role_id"] for timer in timers)
+            # A field boss whose time was restarted from an older report is
+            # marked, so nobody takes the guess for a confirmed spawn.
+            names = [
+                f"≈ {timer.name}"
+                if timer.respawn_minutes and rows[timer.key]["spawn_at"] != spawn
+                else timer.name
+                for timer in timers
+            ]
             text = i18n.t(
                 "timers.ping",
                 lang,
-                names=", ".join(timer.name for timer in timers),
+                names=", ".join(names),
                 when=f"<t:{spawn}:R> (<t:{spawn}:t>)",
             )
             try:

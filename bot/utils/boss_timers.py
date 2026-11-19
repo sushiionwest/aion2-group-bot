@@ -21,9 +21,16 @@ DEFAULT_TIMEZONE = "America/Los_Angeles"
 # How long before a spawn its role is pinged, and how long a ping stays up.
 DEFAULT_LEAD_MINUTES = 5
 PING_LIFETIME_S = 5 * 60
-# A reported field boss counts as "up" this long after its spawn time; past
-# that nobody reported the kill and the timer is unknown again.
-UP_WINDOW_S = 2 * 3600
+# A field boss reads "up" this long after its spawn time, then the board goes
+# back to counting down to the next one.
+UP_WINDOW_S = 3600
+# Without a new report, a field boss's timer restarts on its own this many
+# times, assuming a kill right at each spawn. Every real kill comes a little
+# later than that, so the guess drifts; past this it is dropped as unknown.
+MAX_ESTIMATED_RESPAWNS = 2
+# A spawn this close to the one last pinged for is the same spawn with a
+# corrected time (a member's report replacing an estimate): no second ping.
+SAME_SPAWN_S = 30 * 60
 # The longest countdown a member can enter.
 MAX_COUNTDOWN_S = 48 * 3600
 
@@ -162,6 +169,10 @@ class TimerState:
     live_until: int | None = None  # clock timer currently running
     up_since: int | None = None  # field boss whose spawn time has passed
     set_by: int | None = None  # member who reported a field boss
+    # Field boss times worked out from an older report rather than reported:
+    # the earliest they can be, since the kill may have come later.
+    up_estimated: bool = False
+    next_estimated: bool = False
 
 
 def _value(row, column):
@@ -196,11 +207,30 @@ def timer_state(timer: TimerDef, row, now_ts: int, tz: ZoneInfo) -> TimerState:
 
     spawn_at = _value(row, "spawn_at")
     set_by = _value(row, "set_by")
-    if spawn_at is None or now_ts - spawn_at > UP_WINDOW_S:
+    if spawn_at is None:
         return TimerState()
     if spawn_at > now_ts:
         return TimerState(next_at=spawn_at, set_by=set_by)
-    return TimerState(up_since=spawn_at, set_by=set_by)
+
+    # The reported spawn has passed. Until a member reports again, restart the
+    # count as if the boss died the moment it spawned.
+    respawn = respawn_seconds(timer, row)
+    restarts = (now_ts - spawn_at) // respawn
+    if restarts > MAX_ESTIMATED_RESPAWNS:
+        return TimerState()
+    latest = spawn_at + restarts * respawn
+    following = latest + respawn if restarts < MAX_ESTIMATED_RESPAWNS else None
+    if now_ts - latest <= UP_WINDOW_S:
+        return TimerState(
+            next_at=following,
+            up_since=latest,
+            set_by=set_by,
+            up_estimated=restarts > 0,
+            next_estimated=True,
+        )
+    if following is None:
+        return TimerState()
+    return TimerState(next_at=following, set_by=set_by, next_estimated=True)
 
 
 def due_pings(rows: dict, now_ts: int, tz: ZoneInfo, lead_s: int) -> list:
@@ -214,6 +244,7 @@ def due_pings(rows: dict, now_ts: int, tz: ZoneInfo, lead_s: int) -> list:
         spawn = timer_state(timer, row, now_ts, tz).next_at
         if spawn is None or spawn - now_ts > lead_s:
             continue
-        if row["pinged_for"] != spawn:
+        pinged = row["pinged_for"]
+        if pinged is None or abs(spawn - pinged) >= SAME_SPAWN_S:
             due.append((timer, spawn))
     return due
