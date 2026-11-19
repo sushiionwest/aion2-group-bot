@@ -8,6 +8,12 @@ All notable changes to Kisk are documented here. The format follows
 
 ### Added
 
+- **Boss timers.** `/timers post` puts a live board in a channel: field bosses
+  (Gartua, Lagta, Dartan, Kashapa) are reported by members with a button, and
+  abyss bosses and the Spacetime Rift follow the game server's clock. Times
+  show in each member's own timezone. `/timers role` pings a role before a
+  spawn and removes the ping a few minutes later; `/timers settings`,
+  `/timers respawn` and `/timers schedule` adjust the clock and the timings.
 - **Each server's own event types.** `/eventtypes list/add/remove` lets admins
   edit the list behind the panel's event-type dropdown and `/event`'s type,
   from Discord. A type can ping a role when a group is created, carry its own
