@@ -22,6 +22,17 @@ All notable changes to Kisk are documented here. The format follows
 
 ### Changed
 
+- **The check-in fills empty seats by itself.** "Can't make it" now gives the
+  seat up at once and the next player on the waitlist moves up. The waitlist
+  is pinged by the check-in too and can answer it: 15 minutes before the start
+  (`RSVP_DEADLINE_MINUTES`, `0` to turn off), a party seat whose holder never
+  replied goes to a waitlisted player who said they're coming, same role only
+  in a standard party. The two trade places in the queue, and the prompt shows
+  the deadline. Answers are cleared when a member leaves, re-signs or the
+  event is rescheduled. Members get a private note when they decline or mark
+  themselves ready, a promoted player is reminded to confirm, signing up after
+  the check-in went out counts as coming, and the prompt stays in step with
+  joins and leaves on the event post.
 - **Event posts no longer show the large banner image**, so the channel stays
   compact. `/event`'s type is now an autocomplete over the server's list.
 - **Done deletes the event.** Pressing Done now removes the listing (and its
