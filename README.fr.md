@@ -182,10 +182,26 @@ Par défaut :
 ### 🙋 RSVP — « tu viens ? »
 
 Une heure avant un événement planifié (réglable via `RSVP_MINUTES`), Kisk poste
-une courte invite **« tu viens ? »** qui ping le groupe, avec deux boutons —
-**Je viens ✅** et **Pas dispo ❌**. L'invite se met à jour en direct avec les
-confirmés, les absents et ceux qui n'ont pas répondu, pour que les organisateurs
-comblent les places vides avant le début.
+une courte invite **« tu viens ? »** qui ping le groupe puis, sur une seconde
+ligne, la liste d'attente, avec deux boutons — **Je viens ✅** et **Absent ❌**.
+L'invite se met à jour en direct : qui a confirmé, qui est absent, qui n'a pas
+répondu, et qui en liste d'attente est prêt à prendre une place.
+
+Les places se remplissent ensuite toutes seules :
+
+- **Absent** libère la place tout de suite, comme Quitter. Le joueur suivant en
+  liste d'attente monte dans le groupe et est notifié.
+- **Pas de réponse avant la limite** (15 minutes avant le début, réglable via
+  `RSVP_DEADLINE_MINUTES` ; `0` désactive ce mécanisme) : la place va à un
+  joueur en liste d'attente qui a cliqué sur **Je viens**. Dans un groupe
+  standard, il doit avoir le même rôle : un tank n'est remplacé que par un
+  tank. Les deux échangent leurs positions, donc le joueur qui perd sa place
+  reste en liste d'attente. Une place n'est jamais retirée à un joueur
+  silencieux pour la donner à un autre joueur silencieux, et plus rien ne
+  bouge une fois l'événement commencé.
+
+L'invite affiche l'heure limite dans le fuseau de chaque membre. Une invite
+postée tardivement laisse toujours dix minutes pour répondre.
 
 Les modérateurs peuvent aussi la déclencher immédiatement avec `/rsvp event:
 <lien ou ID du message>` — pratique pour demander tout de suite sans attendre la

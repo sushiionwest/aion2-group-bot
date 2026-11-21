@@ -8,7 +8,6 @@ published messages stay clickable.
 
 import asyncio
 import time
-from collections import defaultdict
 
 import discord
 
@@ -24,7 +23,7 @@ from .logic import (
 )
 from .utils.mentions import join_mentions
 from .utils.permissions import member_is_admin, member_is_moderator
-from .views_common import character_option, refresh_event_message
+from .views_common import EVENT_LOCKS, character_option, refresh_event_message
 from .views_edit import EventEditModal
 from .views_rsvp import RSVPView as RSVPView
 
@@ -115,7 +114,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
     # each read the party, mutate the DB and diff the result across several
     # awaits; serialising per message keeps that read-modify-diff atomic so
     # concurrent clicks can't double-promote or emit phantom promotions.
-    _locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+    _locks: dict[int, asyncio.Lock] = EVENT_LOCKS
 
     # Which buttons carry a translatable label; role buttons (tank/heal/dps)
     # keep their emoji-driven tokens untouched.

@@ -46,6 +46,12 @@ class ProfilesMixin:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (message_id, user_id, display_name, role, joined_at, character_id),
         )
+        # A new place in the queue starts unanswered: a check-in answer given
+        # for an earlier sign-up (a "no" above all) must not follow the member.
+        await self.conn.execute(
+            "DELETE FROM rsvp WHERE message_id = ? AND user_id = ?",
+            (message_id, user_id),
+        )
         await self.conn.commit()
 
     async def set_signup_character(
@@ -79,8 +85,13 @@ class ProfilesMixin:
         await self.conn.commit()
 
     async def remove_signup(self, message_id: int, user_id: int) -> bool:
+        """Removes a sign-up, and the member's check-in answer with it."""
         cur = await self.conn.execute(
             "DELETE FROM signups WHERE message_id = ? AND user_id = ?",
+            (message_id, user_id),
+        )
+        await self.conn.execute(
+            "DELETE FROM rsvp WHERE message_id = ? AND user_id = ?",
             (message_id, user_id),
         )
         await self.conn.commit()

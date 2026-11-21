@@ -185,14 +185,39 @@ def test_cancelled_prefix_is_translated():
 
 def test_rsvp_embed_defaults_to_english():
     event = {"activity": "Dungeon", "title": "Fire Temple", "starts_at": None}
-    embed = build_rsvp_embed(event, [], [])
+    embed = build_rsvp_embed(event, [], [], [])
     assert "Are you coming?" in embed.title
     assert any("Coming (0)" in f.name for f in embed.fields)
 
 
 def test_rsvp_embed_follows_language():
     event = {"activity": "Dungeon", "title": "Fire Temple", "starts_at": None}
-    embed = build_rsvp_embed(event, [], [], lang="fr")
+    embed = build_rsvp_embed(event, [], [], [], lang="fr")
     assert "Tu viens ?" in embed.title
     assert any("Présents (0)" in f.name for f in embed.fields)
     assert any("Sans réponse (0)" in f.name for f in embed.fields)
+
+
+def test_rsvp_embed_shows_the_deadline_and_who_is_ready_on_the_waitlist():
+    event = {"activity": "Dungeon", "title": "Fire Temple", "starts_at": 5000}
+    party = [{"user_id": 1}, {"user_id": 2}]
+    waitlist = [{"user_id": 3}, {"user_id": 4}]
+    rsvps = [
+        {"user_id": 1, "status": "yes"},
+        {"user_id": 4, "status": "yes"},
+        {"user_id": 9, "status": "no"},  # declined, so no longer signed up
+    ]
+    embed = build_rsvp_embed(event, party, waitlist, rsvps, deadline=4100)
+    assert "<t:4100:t>" in embed.description
+    fields = {f.name: f.value for f in embed.fields}
+    assert fields["✅ Coming (1)"] == "• <@1>"
+    assert fields["❌ Can't make it (1)"] == "• <@9>"
+    assert fields["⏳ No reply (1)"] == "• <@2>"
+    assert fields["🪑 Waitlist ready (1 of 2)"] == "• <@4>"
+
+
+def test_rsvp_embed_has_no_waitlist_field_or_deadline_without_them():
+    event = {"activity": "Dungeon", "title": "Fire Temple", "starts_at": 5000}
+    embed = build_rsvp_embed(event, [{"user_id": 1}], [], [])
+    assert "<t:" not in embed.description.split("\n", 1)[1]
+    assert len(embed.fields) == 3

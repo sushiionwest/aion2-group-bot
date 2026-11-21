@@ -12,7 +12,7 @@ from .logic import (
     split_groups,
     standard_slots,
 )
-from .utils.rsvp import rsvp_summary
+from .utils.rsvp import checkin_tally
 from .utils.text import truncate_field
 
 
@@ -266,18 +266,33 @@ def build_event_embed(
 
 
 def build_rsvp_embed(
-    event, party: list, rsvps: list, lang: str = "en"
+    event,
+    party: list,
+    waitlist: list,
+    rsvps: list,
+    lang: str = "en",
+    deadline: int | None = None,
 ) -> discord.Embed:
-    """The 'are you coming?' prompt, with live confirmed/declined/awaiting."""
+    """The 'are you coming?' prompt, with live confirmed/declined/awaiting.
+
+    `deadline` is when unanswered seats may start going to the waitlist (see
+    `checkin_deadline`); None leaves that line out.
+    """
     responses = {r["user_id"]: r["status"] for r in rsvps}
     party_ids = [s["user_id"] for s in party]
-    confirmed, declined, awaiting = rsvp_summary(party_ids, responses)
+    waitlist_ids = [s["user_id"] for s in waitlist]
+    confirmed, declined, awaiting, ready = checkin_tally(
+        party_ids, waitlist_ids, responses
+    )
 
     emoji = activity_emoji(event)
     when = f" • 🕘 <t:{event['starts_at']}:R>" if event["starts_at"] else ""
+    hint = i18n.t("rsvp.body_hint", lang)
+    if deadline is not None:
+        hint += "\n" + i18n.t("rsvp.deadline_hint", lang, ts=deadline)
     embed = discord.Embed(
         title=f"{emoji} " + i18n.t("rsvp.title", lang, title=event["title"]),
-        description=f"**{event['activity']}**{when}\n" + i18n.t("rsvp.body_hint", lang),
+        description=f"**{event['activity']}**{when}\n{hint}",
         colour=discord.Colour.blurple(),
     )
     brand(embed)
@@ -301,4 +316,11 @@ def build_rsvp_embed(
         value=_mentions(awaiting),
         inline=True,
     )
+    if waitlist:
+        embed.add_field(
+            name="🪑 "
+            + i18n.t("rsvp.waitlist_ready", lang, n=len(ready), total=len(waitlist)),
+            value=_mentions(ready),
+            inline=False,
+        )
     return embed
