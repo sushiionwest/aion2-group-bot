@@ -689,6 +689,7 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
             priorities = reorder_priorities(ordered_ids, self.selected, direction)
             await db.set_signup_priorities(self.event["message_id"], priorities)
             signups = await db.get_signups(self.event["message_id"])
+            await self._confirm_if_seated(interaction.client, party_before, signups)
 
             # Answer the interaction (redraw the ephemeral panel) before the
             # slower HTTP edit of the public event message.
@@ -698,6 +699,22 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
             await refresh_event_message(interaction.client, self.event)
             await checkin.sync_prompt(interaction.client, self.event)
             await self._announce_promoted(interaction, party_before, signups)
+
+    async def _confirm_if_seated(self, client, party_before: list, signups: list):
+        """Counts a player an admin just moved into the party as coming.
+
+        While the check-in is out, an unconfirmed seat can be handed to a
+        ready waitlisted player. An admin who seats someone by hand has made
+        that call already, so the timed pass must not undo it a minute later.
+        The panel's event row dates from when it was opened: re-read it.
+        """
+        event = await client.db.get_event(self.event["message_id"])
+        if event is None or not checkin.is_live(event, time.time()):
+            return
+        party, _ = assign(event["compo"], event["size"], signups)
+        was_seated = self.selected in {s["user_id"] for s in party_before}
+        if not was_seated and self.selected in {s["user_id"] for s in party}:
+            await client.db.set_rsvp(event["message_id"], self.selected, YES)
 
     async def _announce_promoted(
         self, interaction, party_before: list, signups: list, swaps: list | tuple = ()

@@ -80,6 +80,7 @@
   "rsvp.declined": "Absents ({n})",
   "rsvp.awaiting": "Sans réponse ({n})",
   "rsvp.deadline_hint": "⏰ Réponds avant <t:{ts}:t> (<t:{ts}:R>). Passé ce délai, une place sans réponse peut aller à un joueur en liste d'attente qui a confirmé sa présence.",
+  "rsvp.same_role": "Les places ne changent qu'au sein d'un même rôle : un tank pour un tank, un heal pour un heal, un DPS pour un DPS.",
   "rsvp.waitlist_ready": "Liste d'attente prête ({n} sur {total})",
   "rsvp.waitlist_ping": "Liste d'attente : {mentions} — clique sur ✅ si tu peux prendre une place qui se libère.",
   "rsvp.swapped": "🔁 **{title}** — places réattribuées après la fin du délai de confirmation :",

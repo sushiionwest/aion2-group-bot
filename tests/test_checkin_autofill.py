@@ -48,7 +48,10 @@ class _Channel:
 
 class _Response:
     def __init__(self):
-        self.edits, self.private = [], []
+        self.edits, self.private, self.deferred = [], [], False
+
+    async def defer(self):
+        self.deferred = True
 
     async def edit_message(self, **kwargs):
         self.edits.append(kwargs)
@@ -119,12 +122,18 @@ class _World:
         async def followup_send(content, ephemeral=False, **_):
             (private if ephemeral else public).append(content)
 
+        response = _Response()
+
+        async def edit_original_response(**kwargs):
+            response.edits.append(kwargs)
+
         return SimpleNamespace(
             client=self.client,
             guild=None,
             user=SimpleNamespace(id=user_id, display_name=f"u{user_id}"),
             message=SimpleNamespace(id=message_id),
-            response=_Response(),
+            response=response,
+            edit_original_response=edit_original_response,
             followup=SimpleNamespace(send=followup_send),
             public=public,
             private=private,
@@ -191,10 +200,10 @@ def test_someone_not_signed_up_cannot_answer(tmp_path, monkeypatch):
     async def scenario(w):
         await w.event([(1, "dps")])
         response, _ = await w.press(77, "yes")
-        return response, await w.db.get_rsvps(EVENT_ID)
+        return w.private, await w.db.get_rsvps(EVENT_ID)
 
-    response, rsvps = _run(tmp_path, monkeypatch, scenario)
-    assert response.private == ["Sign up for the event first, then RSVP here."]
+    private, rsvps = _run(tmp_path, monkeypatch, scenario)
+    assert private == ["Sign up for the event first, then RSVP here."]
     assert rsvps == []
 
 
@@ -342,11 +351,11 @@ def test_an_old_prompt_takes_no_answers_after_a_reschedule(tmp_path, monkeypatch
             description=None,
             rearm_notifications=True,
         )
-        response, followups = await w.press(3, "yes")
-        return response, followups, await w.lists(), await w.db.get_rsvps(EVENT_ID)
+        _response, followups = await w.press(3, "yes")
+        return w.private, followups, await w.lists(), await w.db.get_rsvps(EVENT_ID)
 
-    response, followups, lists, rsvps = _run(tmp_path, monkeypatch, scenario)
-    assert response.private == ["This RSVP is no longer active."]
+    private, followups, lists, rsvps = _run(tmp_path, monkeypatch, scenario)
+    assert private == ["This RSVP is no longer active."]
     assert followups == []
     assert lists == ([1, 2], [3])
     assert rsvps == []
@@ -391,10 +400,11 @@ def test_an_old_prompt_stops_working_once_a_new_one_is_posted(tmp_path, monkeypa
         old = w.prompt
         await w.db.set_rsvp_prompt_id(EVENT_ID, old + 1)
         response, _ = await w.press(1, "yes", prompt=old)
-        return response
+        return response.private, await w.db.get_rsvps(EVENT_ID)
 
-    response = _run(tmp_path, monkeypatch, scenario)
-    assert response.private == ["This RSVP is no longer active."]
+    private, rsvps = _run(tmp_path, monkeypatch, scenario)
+    assert private == ["This RSVP is no longer active."]
+    assert rsvps == []
 
 
 def test_answers_do_not_survive_leaving_rejoining_or_a_reschedule(tmp_path):
@@ -575,3 +585,70 @@ def test_promotion_without_a_check_in_keeps_the_plain_wording(tmp_path, monkeypa
     public, prompt_edits = _run(tmp_path, monkeypatch, scenario)
     assert public == [PROMOTED_3]
     assert prompt_edits == []
+
+
+def test_a_tap_is_acknowledged_before_it_waits_its_turn(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps")], starts_in=60 * 60)
+        interaction = w._interaction(1, w.prompt)
+        seen = []
+
+        async def defer():
+            # The event's lock must not be held yet when the click is answered.
+            seen.append(views_rsvp.EVENT_LOCKS[EVENT_ID].locked())
+
+        interaction.response.defer = defer
+        await RSVPView("en")._respond(interaction, "yes")
+        return seen
+
+    assert _run(tmp_path, monkeypatch, scenario) == [False]
+
+
+def test_standard_events_say_that_seats_only_move_within_a_role(tmp_path, monkeypatch):
+    async def scenario(w):
+        members = [(1, "tank"), (2, "heal"), (3, "dps"), (4, "dps"), (5, "dps")]
+        members += [(6, "dps")]
+        await w.event(members, compo=COMPO_STANDARD, size=5, starts_in=60 * 60)
+        response, _ = await w.press(6, "yes")
+        return response.edits[0]["embed"].description, w.private[0]
+
+    description, private = _run(tmp_path, monkeypatch, scenario)
+    rule = "Seats only move within a role: a tank for a tank"
+    assert rule in description
+    assert rule in private
+
+
+def test_open_events_do_not_mention_roles(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps")], starts_in=60 * 60)
+        response, _ = await w.press(3, "yes")
+        return response.edits[0]["embed"].description, w.private[0]
+
+    description, private = _run(tmp_path, monkeypatch, scenario)
+    assert "within a role" not in description
+    assert "within a role" not in private
+
+
+def test_a_player_seated_by_an_admin_is_not_swapped_back_out(tmp_path, monkeypatch):
+    from bot.views import QueueManageView
+
+    async def scenario(w):
+        # 1 and 2 confirmed; 3 is ready on the waitlist; 4 is silent behind them.
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps"), (4, "dps")])
+        for user_id in (1, 2, 3):
+            await w.db.set_rsvp(EVENT_ID, user_id, "yes")
+        event = await w.db.get_event(EVENT_ID)
+        panel = QueueManageView(event, await w.db.get_signups(EVENT_ID), "en")
+        panel.selected = 4
+        # An admin moves 4 up twice: past 3, then into the party over 2.
+        for _ in range(2):
+            await panel.up_button.callback(w._interaction(99, EVENT_ID))
+        seated = await w.lists()
+        swaps = await checkin.timed_pass(w.client, EVENT_ID)
+        return seated, swaps, await w.lists()
+
+    seated, swaps, final = _run(tmp_path, monkeypatch, scenario)
+    assert seated == ([1, 4], [2, 3])
+    # The pass leaves the admin's choice alone.
+    assert swaps == []
+    assert final == seated

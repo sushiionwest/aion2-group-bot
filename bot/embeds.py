@@ -265,6 +265,14 @@ def build_event_embed(
     return embed
 
 
+def _is_standard(event) -> bool:
+    """Whether the event has per-role seats (rows and plain dicts alike)."""
+    try:
+        return event["compo"] == COMPO_STANDARD
+    except (KeyError, IndexError):
+        return False
+
+
 def build_rsvp_embed(
     event,
     party: list,
@@ -290,6 +298,8 @@ def build_rsvp_embed(
     hint = i18n.t("rsvp.body_hint", lang)
     if deadline is not None:
         hint += "\n" + i18n.t("rsvp.deadline_hint", lang, ts=deadline)
+        if _is_standard(event):
+            hint += " " + i18n.t("rsvp.same_role", lang)
     embed = discord.Embed(
         title=f"{emoji} " + i18n.t("rsvp.title", lang, title=event["title"]),
         description=f"**{event['activity']}**{when}\n{hint}",

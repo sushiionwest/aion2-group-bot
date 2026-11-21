@@ -6,7 +6,7 @@ import discord
 
 from . import checkin, i18n
 from .errors import ViewErrorMixin
-from .logic import assign
+from .logic import COMPO_STANDARD, assign
 from .utils.rsvp import NO, YES
 from .views_common import EVENT_LOCKS, refresh_event_message
 
@@ -65,6 +65,10 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
 
         message_id = found["message_id"]
         user_id = interaction.user.id
+        # Acknowledge now: a check-in pings everyone at once, the taps queue on
+        # the event's lock, and Discord drops a click left unanswered for three
+        # seconds. Everything after this goes through follow-ups and edits.
+        await interaction.response.defer()
         async with EVENT_LOCKS[message_id]:
             # Re-read under the lock: the event may have been cancelled,
             # completed or given a newer prompt since the click. A reschedule
@@ -78,13 +82,13 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
                 or not event["rsvp_sent"]
                 or event["rsvp_prompt_id"] != interaction.message.id
             ):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     i18n.t("rsvp.inactive", lang), ephemeral=True
                 )
                 return
             signups = await db.get_signups(message_id)
             if user_id not in {s["user_id"] for s in signups}:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     i18n.t("rsvp.sign_up_first", lang), ephemeral=True
                 )
                 return
@@ -101,10 +105,8 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
             party_after, waitlist_after = assign(
                 event["compo"], event["size"], await db.get_signups(message_id)
             )
-            # Answer the click first: Discord drops an interaction left
-            # unanswered for three seconds, so the other edits come after.
             embed = await checkin.build_prompt_embed(client, event, lang)
-            await interaction.response.edit_message(embed=embed, view=self)
+            await interaction.edit_original_response(embed=embed, view=self)
 
             changed = [s["user_id"] for s in party_before] != [
                 s["user_id"] for s in party_after
@@ -153,4 +155,7 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
             return None  # in the party, or just given a seat (announced publicly)
         deadline = checkin.prompt_deadline(event)
         key = "rsvp.ack_ready" if deadline else "rsvp.ack_ready_no_deadline"
-        return i18n.t(key, lang, title=event["title"], position=position, ts=deadline)
+        note = i18n.t(key, lang, title=event["title"], position=position, ts=deadline)
+        if deadline and event["compo"] == COMPO_STANDARD:
+            note += " " + i18n.t("rsvp.same_role", lang)
+        return note

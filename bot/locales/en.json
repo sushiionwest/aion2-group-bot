@@ -80,6 +80,7 @@
   "rsvp.declined": "Can't make it ({n})",
   "rsvp.awaiting": "No reply ({n})",
   "rsvp.deadline_hint": "⏰ Answer by <t:{ts}:t> (<t:{ts}:R>). After that, a seat with no reply can go to a waitlisted player who said they're coming.",
+  "rsvp.same_role": "Seats only move within a role: a tank for a tank, a healer for a healer, a DPS for a DPS.",
   "rsvp.waitlist_ready": "Waitlist ready ({n} of {total})",
   "rsvp.waitlist_ping": "Waitlist: {mentions} — tap ✅ if you can take a seat that frees up.",
   "rsvp.swapped": "🔁 **{title}** — seats moved after the check-in deadline:",
