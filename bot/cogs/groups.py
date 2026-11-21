@@ -7,10 +7,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import config, i18n
+from .. import checkin, config, i18n
 from ..actions import post_event, publish_event, resolve_channel, type_ping_role
 from ..branding import brand
-from ..embeds import PRESENCE_ACTIVITY_EMOJI, build_rsvp_embed
+from ..embeds import PRESENCE_ACTIVITY_EMOJI
 from ..errors import resilient_tick
 from ..logic import COMPO_OPEN, COMPO_STANDARD, assign
 from ..utils.mentions import join_mentions, ping_permitted
@@ -25,6 +25,11 @@ from ..views import RSVPView
 # A temporary voice channel is cleaned up this long after the event's start
 # even if nobody pressed Done.
 VOICE_CLEANUP_GRACE = 3 * 60 * 60
+
+# The check-in pings the party and, on a second line, the waitlist. Together
+# they must stay under Discord's 2000-character message limit.
+PARTY_PING_BUDGET = 1300
+WAITLIST_PING_BUDGET = 500
 
 # A recurring event's instance is posted this long before its occurrence, so
 # players have time to sign up.
@@ -53,6 +58,7 @@ class Groups(commands.Cog):
 
     async def cog_load(self):
         self.rsvp_prompts.start()
+        self.checkin_autofill.start()
         self.voice_channels.start()
         self.recurring_events.start()
         self.cleanup_events.start()
@@ -60,6 +66,7 @@ class Groups(commands.Cog):
 
     async def cog_unload(self):
         self.rsvp_prompts.cancel()
+        self.checkin_autofill.cancel()
         self.voice_channels.cancel()
         self.recurring_events.cancel()
         self.cleanup_events.cancel()
@@ -372,14 +379,14 @@ class Groups(commands.Cog):
             )
             return
         signups = await self.bot.db.get_signups(ev["message_id"])
-        party, _ = assign(ev["compo"], ev["size"], signups)
+        party, waitlist = assign(ev["compo"], ev["size"], signups)
         if not party:
             await interaction.response.send_message(
                 i18n.t("rsvp.nobody_signed_up", lang), ephemeral=True
             )
             return
         try:
-            prompt = await self._send_rsvp(ev, party)
+            prompt = await self._send_rsvp(ev, party, waitlist)
         except discord.HTTPException:
             await interaction.response.send_message(
                 i18n.t("rsvp.post_failed", lang), ephemeral=True
@@ -407,7 +414,7 @@ class Groups(commands.Cog):
                 continue  # already started: nothing to ask
             try:
                 signups = await self.bot.db.get_signups(ev["message_id"])
-                party, _ = assign(ev["compo"], ev["size"], signups)
+                party, waitlist = assign(ev["compo"], ev["size"], signups)
                 if not party:
                     continue  # nobody signed up
                 # Re-read right before sending: a cancellation landing after the
@@ -415,7 +422,7 @@ class Groups(commands.Cog):
                 event = await self.bot.db.get_event(ev["message_id"])
                 if event is None or event["status"] != "open":
                     continue
-                prompt = await self._send_rsvp(event, party)
+                prompt = await self._send_rsvp(event, party, waitlist)
                 await self.bot.db.set_rsvp_prompt_id(event["message_id"], prompt.id)
             except discord.HTTPException:
                 pass  # channel deleted or permissions revoked: skip
@@ -432,31 +439,48 @@ class Groups(commands.Cog):
 
     async def _rsvp_channel(self, ev):
         """The configured RSVP channel if set, else the event's own channel."""
-        settings = await self.bot.db.get_settings(ev["guild_id"])
-        channel_id = settings["rsvp_channel_id"] if settings else None
-        if channel_id:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
-                try:
-                    channel = await self.bot.fetch_channel(channel_id)
-                except discord.HTTPException:
-                    channel = None
-            if channel is not None and hasattr(channel, "send"):
-                return channel
-        return await self._channel(ev["channel_id"])
+        return await checkin.rsvp_channel(self.bot, ev)
 
-    async def _send_rsvp(self, ev, party):
+    async def _send_rsvp(self, ev, party, waitlist=()):
+        """Posts the check-in, pinging the party and then the waitlist.
+
+        The waitlist is asked too: a waitlisted member who says they are
+        coming is who takes a seat nobody confirmed.
+        """
         lang = await i18n.resolve_lang(self.bot.db, self.bot.get_guild(ev["guild_id"]))
         channel = await self._rsvp_channel(ev)
-        rsvps = await self.bot.db.get_rsvps(ev["message_id"])
-        embed = build_rsvp_embed(ev, party, rsvps, lang=lang)
-        mentions = join_mentions(s["user_id"] for s in party)
+        embed = await checkin.build_prompt_embed(
+            self.bot, ev, lang, posted_at=time.time()
+        )
+        content = join_mentions((s["user_id"] for s in party), PARTY_PING_BUDGET)
+        standby = join_mentions((s["user_id"] for s in waitlist), WAITLIST_PING_BUDGET)
+        if standby:
+            content += "\n" + i18n.t("rsvp.waitlist_ping", lang, mentions=standby)
         return await channel.send(
-            content=mentions or None,
+            content=content or None,
             embed=embed,
             view=RSVPView(lang),
             allowed_mentions=discord.AllowedMentions(users=True),
         )
+
+    # ----- Check-in follow-up: unanswered seats go to the waitlist -----
+
+    @tasks.loop(seconds=60)
+    @resilient_tick
+    async def checkin_autofill(self):
+        lead = config.RSVP_DEADLINE_MINUTES * 60
+        if lead <= 0:
+            return  # switched off
+        now = int(time.time())
+        for ev in await self.bot.db.events_in_checkin(now, lead):
+            try:
+                await checkin.timed_pass(self.bot, ev["message_id"], now)
+            except discord.HTTPException:
+                pass  # channel deleted or permissions revoked: skip
+
+    @checkin_autofill.before_loop
+    async def _wait_ready_checkin(self):
+        await self.bot.wait_until_ready()
 
     # ----- Temporary voice channels -----
 

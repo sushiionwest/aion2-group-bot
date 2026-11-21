@@ -1,9 +1,18 @@
 """Shared event-view helpers: redraw the event message and one character option."""
 
+import asyncio
+from collections import defaultdict
+
 import discord
 
 from . import config, i18n
 from .embeds import ROLE_LABEL, build_event_embed
+
+# One lock per event message. Joining, leaving, switching roles, answering the
+# check-in and the timed seat hand-over each read the party, change the
+# database and compare the result across several awaits; taking this lock
+# around that keeps concurrent clicks from double-promoting anyone.
+EVENT_LOCKS: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 
 async def refresh_event_message(client, event) -> list:

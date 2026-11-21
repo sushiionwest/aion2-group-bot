@@ -337,6 +337,10 @@ class Database(ProfilesMixin, BoardsMixin, EventTypesMixin, TimersMixin):
                    WHERE message_id = ?""",
                 (title, starts_at, description, message_id),
             )
+            # Answers were for the old time: the new check-in starts clean.
+            await self.conn.execute(
+                "DELETE FROM rsvp WHERE message_id = ?", (message_id,)
+            )
         else:
             await self.conn.execute(
                 """UPDATE events SET title = ?, starts_at = ?, description = ?
@@ -650,6 +654,21 @@ class Database(ProfilesMixin, BoardsMixin, EventTypesMixin, TimersMixin):
         )
         await self.conn.commit()
         return cur.rowcount > 0
+
+    async def events_in_checkin(self, now_ts: int, lead_s: int):
+        """Open events with a check-in posted that start within `lead_s`.
+
+        These are the events whose unanswered seats may be due to go to the
+        waitlist; an event that has already started is left alone.
+        """
+        async with self.conn.execute(
+            """SELECT * FROM events
+               WHERE status = 'open' AND rsvp_sent = 1
+                 AND rsvp_prompt_id IS NOT NULL
+                 AND starts_at IS NOT NULL AND starts_at > ? AND starts_at <= ?""",
+            (now_ts, now_ts + lead_s),
+        ) as cur:
+            return await cur.fetchall()
 
     async def set_rsvp_prompt_id(self, message_id: int, prompt_id: int) -> None:
         await self.conn.execute(
