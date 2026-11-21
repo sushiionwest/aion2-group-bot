@@ -198,7 +198,8 @@ replied, and who on the waitlist is ready to step in.
 Seats then fill themselves:
 
 - **Can't make it** gives the seat up at once, like Leave. The next player on
-  the waitlist moves up and is pinged.
+  the waitlist moves up and is pinged, with a reminder to confirm the seat.
+  The member who declined gets a private note saying how to sign up again.
 - **No reply by the deadline** (15 minutes before the start, configurable via
   `RSVP_DEADLINE_MINUTES`; `0` turns this off): the seat goes to a waitlisted
   player who tapped **I'm coming**. In a standard party it has to be the same
@@ -208,7 +209,9 @@ Seats then fill themselves:
   once the event has started.
 
 The prompt shows the deadline in each member's own time. A check-in posted
-late still leaves ten minutes to answer.
+late still leaves ten minutes to answer. Signing up after the check-in went
+out counts as "I'm coming", since that member was never asked, and the prompt
+redraws whenever someone joins, leaves or is moved on the event post.
 
 Moderators can also trigger it on the spot with `/rsvp event: <message link or
 ID>` — handy to ask right away instead of waiting for the automatic window.

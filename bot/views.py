@@ -11,7 +11,7 @@ import time
 
 import discord
 
-from . import config, i18n
+from . import checkin, config, i18n
 from .embeds import ROLE_EMOJI, ROLE_LABEL, build_event_embed
 from .errors import ViewErrorMixin
 from .logic import (
@@ -23,6 +23,7 @@ from .logic import (
 )
 from .utils.mentions import join_mentions
 from .utils.permissions import member_is_admin, member_is_moderator
+from .utils.rsvp import YES
 from .views_common import EVENT_LOCKS, character_option, refresh_event_message
 from .views_edit import EventEditModal
 from .views_rsvp import RSVPView as RSVPView
@@ -104,6 +105,7 @@ class CharacterPicker(ViewErrorMixin, discord.ui.View):
             )
             await interaction.response.edit_message(content=message, view=None)
             await refresh_event_message(interaction.client, self.event)
+            await checkin.sync_prompt(interaction.client, self.event)
             await self.signups.announce_promoted(interaction, self.event, party_before)
 
 
@@ -188,9 +190,13 @@ class SignupView(ViewErrorMixin, discord.ui.View):
                 )
                 return
 
+            # Past the check-in deadline the freed seat goes straight to a
+            # confirmed player, so one announcement covers the final result.
+            swaps = await checkin.run_autofill(interaction.client, event, time.time())
             await self._update_message(interaction, event)
             await interaction.followup.send(i18n.t("signup.left", lang), ephemeral=True)
-            await self.announce_promoted(interaction, event, party_before)
+            await checkin.sync_prompt(interaction.client, event)
+            await self.announce_promoted(interaction, event, party_before, swaps)
 
     @discord.ui.button(
         label="Complete event",
@@ -404,6 +410,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             )
             await interaction.response.send_message(message, ephemeral=True)
             await refresh_event_message(interaction.client, event)
+            await checkin.sync_prompt(interaction.client, event)
             await self.announce_promoted(interaction, event, party_before)
 
     async def perform_join(
@@ -436,6 +443,11 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             time.time(),
             character["id"] if character else None,
         )
+        if checkin.is_live(event, time.time()):
+            # The check-in already went out, so this member was never asked.
+            # Signing up this close to the start is the answer: they count as
+            # coming rather than as a seat nobody confirmed.
+            await db.set_rsvp(event["message_id"], interaction.user.id, YES)
 
         signups = await db.get_signups(event["message_id"])
         party, waitlist = assign(event["compo"], event["size"], signups)
@@ -505,25 +517,26 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
         return signups
 
-    async def announce_promoted(self, interaction, event, party_before: list):
-        """Publicly notifies players promoted from the waitlist to the party."""
-        signups = await interaction.client.db.get_signups(event["message_id"])
+    async def announce_promoted(
+        self, interaction, event, party_before: list, swaps: list | tuple = ()
+    ):
+        """Publicly notifies players whose seat changed because of this click."""
+        client = interaction.client
+        signups = await client.db.get_signups(event["message_id"])
         party, _ = assign(event["compo"], event["size"], signups)
-        ids_before = {s["user_id"] for s in party_before}
-        promoted = [
-            s
-            for s in party
-            if s["user_id"] not in ids_before and s["user_id"] != interaction.user.id
-        ]
-        if promoted:
-            lang = await i18n.resolve_lang(interaction.client.db, interaction.guild)
-            mentions = join_mentions(s["user_id"] for s in promoted)
-            await interaction.followup.send(
-                i18n.t(
-                    "signup.promoted", lang, mentions=mentions, title=event["title"]
-                ),
-                allowed_mentions=discord.AllowedMentions(users=True),
-            )
+        lang = await i18n.resolve_lang(client.db, interaction.guild)
+        await checkin.announce(
+            interaction.followup.send,
+            checkin.change_messages(
+                event,
+                party_before,
+                party,
+                list(swaps),
+                lang,
+                skip_user_id=interaction.user.id,
+                confirm_ids=await checkin.unconfirmed_ids(client, event, time.time()),
+            ),
+        )
 
 
 def _ranked_signups(signups: list) -> list:
@@ -646,6 +659,9 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
 
             party_before, _ = assign(self.event["compo"], self.event["size"], signups)
             await db.remove_signup(self.event["message_id"], self.selected)
+            swaps = await checkin.run_autofill(
+                interaction.client, self.event, time.time()
+            )
             signups = await db.get_signups(self.event["message_id"])
 
             # Answer the interaction first, as in _move.
@@ -654,7 +670,8 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
                 **_queue_panel(self.event, signups, self.lang, note=note)
             )
             await refresh_event_message(interaction.client, self.event)
-            await self._announce_promoted(interaction, party_before, signups)
+            await checkin.sync_prompt(interaction.client, self.event)
+            await self._announce_promoted(interaction, party_before, signups, swaps)
 
     async def _move(self, interaction: discord.Interaction, direction: str):
         db = interaction.client.db
@@ -679,27 +696,29 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
                 **_queue_panel(self.event, signups, self.lang, self.selected)
             )
             await refresh_event_message(interaction.client, self.event)
+            await checkin.sync_prompt(interaction.client, self.event)
             await self._announce_promoted(interaction, party_before, signups)
 
-    async def _announce_promoted(self, interaction, party_before: list, signups: list):
+    async def _announce_promoted(
+        self, interaction, party_before: list, signups: list, swaps: list | tuple = ()
+    ):
+        """Tells the event's channel whose seat changed after an admin action."""
+        client = interaction.client
         party, _ = assign(self.event["compo"], self.event["size"], signups)
-        ids_before = {s["user_id"] for s in party_before}
-        promoted = [s for s in party if s["user_id"] not in ids_before]
-        if not promoted:
-            return
-        channel = interaction.client.get_channel(self.event["channel_id"])
-        if channel is None:
-            channel = await interaction.client.fetch_channel(self.event["channel_id"])
-        mentions = join_mentions(s["user_id"] for s in promoted)
-        await channel.send(
-            i18n.t(
-                "signup.promoted",
-                self.lang,
-                mentions=mentions,
-                title=self.event["title"],
-            ),
-            allowed_mentions=discord.AllowedMentions(users=True),
+        messages = checkin.change_messages(
+            self.event,
+            party_before,
+            party,
+            list(swaps),
+            self.lang,
+            confirm_ids=await checkin.unconfirmed_ids(client, self.event, time.time()),
         )
+        if not messages:
+            return
+        channel = client.get_channel(self.event["channel_id"])
+        if channel is None:
+            channel = await client.fetch_channel(self.event["channel_id"])
+        await checkin.announce(channel.send, messages)
 
 
 class RetiredButtonsView(ViewErrorMixin, discord.ui.View):

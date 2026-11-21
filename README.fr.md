@@ -190,7 +190,9 @@ répondu, et qui en liste d'attente est prêt à prendre une place.
 Les places se remplissent ensuite toutes seules :
 
 - **Absent** libère la place tout de suite, comme Quitter. Le joueur suivant en
-  liste d'attente monte dans le groupe et est notifié.
+  liste d'attente monte dans le groupe et est notifié, avec un rappel de
+  confirmer sa place. Le membre absent reçoit une note privée expliquant
+  comment se réinscrire.
 - **Pas de réponse avant la limite** (15 minutes avant le début, réglable via
   `RSVP_DEADLINE_MINUTES` ; `0` désactive ce mécanisme) : la place va à un
   joueur en liste d'attente qui a cliqué sur **Je viens**. Dans un groupe
@@ -201,7 +203,10 @@ Les places se remplissent ensuite toutes seules :
   bouge une fois l'événement commencé.
 
 L'invite affiche l'heure limite dans le fuseau de chaque membre. Une invite
-postée tardivement laisse toujours dix minutes pour répondre.
+postée tardivement laisse toujours dix minutes pour répondre. S'inscrire après
+l'envoi de l'invite compte comme « Je viens », puisque ce membre n'a jamais été
+sollicité, et l'invite se redessine dès que quelqu'un rejoint, quitte ou est
+déplacé sur l'annonce de l'événement.
 
 Les modérateurs peuvent aussi la déclencher immédiatement avec `/rsvp event:
 <lien ou ID du message>` — pratique pour demander tout de suite sans attendre la

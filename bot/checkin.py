@@ -13,7 +13,8 @@ import discord
 from . import config, i18n
 from .embeds import build_rsvp_embed
 from .logic import assign
-from .utils.rsvp import autofill_swaps, checkin_deadline, ranking_priorities
+from .utils.mentions import join_mentions
+from .utils.rsvp import YES, autofill_swaps, checkin_deadline, ranking_priorities
 from .views_common import EVENT_LOCKS, refresh_event_message
 
 # Seat changes listed per announcement; a siege can move many at once and a
@@ -51,6 +52,35 @@ def prompt_deadline(event, posted_at: float | None = None) -> int | None:
             return None
         posted_at = discord.utils.snowflake_time(event["rsvp_prompt_id"]).timestamp()
     return checkin_deadline(event["starts_at"], posted_at, config.RSVP_DEADLINE_MINUTES)
+
+
+def is_live(event, now: float) -> bool:
+    """Whether the event's check-in is out and still being answered.
+
+    False before the prompt is posted, while a rescheduled event waits for its
+    new prompt, and once the event has started.
+    """
+    if not event["rsvp_sent"] or not event["rsvp_prompt_id"]:
+        return False
+    return not event["starts_at"] or now < event["starts_at"]
+
+
+async def unconfirmed_ids(client, event, now: float) -> set[int]:
+    """Signed-up members who still owe the live check-in an answer.
+
+    Empty when no check-in is live, so callers can pass it straight to
+    `change_messages`: a promoted member is only asked to confirm when there
+    is something to confirm on.
+    """
+    if not is_live(event, now):
+        return set()
+    said_yes = {
+        r["user_id"]
+        for r in await client.db.get_rsvps(event["message_id"])
+        if r["status"] == YES
+    }
+    signups = await client.db.get_signups(event["message_id"])
+    return {s["user_id"] for s in signups} - said_yes
 
 
 async def build_prompt_embed(client, event, lang: str, posted_at: float | None = None):
@@ -96,13 +126,16 @@ def change_messages(
     swaps: list[tuple[int, int]],
     lang: str,
     skip_user_id: int | None = None,
+    confirm_ids: frozenset | set = frozenset(),
 ) -> list[str]:
     """The public announcements for a change of party, as message bodies.
 
     Compares the party before and after, so only what really changed is
     announced: a member who was promoted and swapped out again in the same
     step is never pinged. `skip_user_id` is the member who caused the change
-    by pressing a button, who gets their answer privately instead.
+    by pressing a button, who gets their answer privately instead. Promoted
+    members listed in `confirm_ids` (see `unconfirmed_ids`) are also told to
+    answer the check-in, since an unconfirmed seat can still be handed on.
     """
     before = {s["user_id"] for s in party_before}
     after = {s["user_id"] for s in party_after}
@@ -121,15 +154,14 @@ def change_messages(
     ]
 
     messages = []
-    if promoted:
-        messages.append(
-            i18n.t(
-                "signup.promoted",
-                lang,
-                mentions=" ".join(f"<@{u}>" for u in promoted),
-                title=event["title"],
+    for key, group in (
+        ("signup.promoted", [u for u in promoted if u not in confirm_ids]),
+        ("rsvp.promoted_confirm", [u for u in promoted if u in confirm_ids]),
+    ):
+        if group:
+            messages.append(
+                i18n.t(key, lang, mentions=join_mentions(group), title=event["title"])
             )
-        )
     for start in range(0, len(net_swaps), SWAP_LINES_PER_MESSAGE):
         lines = [
             i18n.t("rsvp.swap_line", lang, newcomer=f"<@{in_id}>", out=f"<@{out_id}>")
@@ -162,6 +194,20 @@ async def refresh_prompt(client, event) -> None:
     embed = await build_prompt_embed(client, event, lang)
     channel = await rsvp_channel(client, event)
     await channel.get_partial_message(event["rsvp_prompt_id"]).edit(embed=embed)
+
+
+async def sync_prompt(client, event) -> None:
+    """Best-effort redraw of the check-in after the party changed elsewhere.
+
+    Joining, leaving and admin queue changes happen on the event post; without
+    this the check-in would keep listing a party that no longer exists.
+    """
+    if not event["rsvp_sent"] or not event["rsvp_prompt_id"]:
+        return
+    try:
+        await refresh_prompt(client, event)
+    except discord.HTTPException:
+        pass  # prompt deleted or not editable: nothing to keep in sync
 
 
 async def timed_pass(client, message_id: int, now: float | None = None) -> list:

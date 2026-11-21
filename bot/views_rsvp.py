@@ -96,8 +96,9 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
                 await db.remove_signup(message_id, user_id)
             await db.set_rsvp(message_id, user_id, status)
             swaps = await checkin.run_autofill(client, event, time.time())
+            confirm_ids = await checkin.unconfirmed_ids(client, event, time.time())
 
-            party_after, _ = assign(
+            party_after, waitlist_after = assign(
                 event["compo"], event["size"], await db.get_signups(message_id)
             )
             # Answer the click first: Discord drops an interaction left
@@ -116,6 +117,40 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
             await checkin.announce(
                 interaction.followup.send,
                 checkin.change_messages(
-                    event, party_before, party_after, swaps, lang, skip_user_id=user_id
+                    event,
+                    party_before,
+                    party_after,
+                    swaps,
+                    lang,
+                    skip_user_id=user_id,
+                    confirm_ids=confirm_ids,
                 ),
             )
+            # Tell the member privately what their tap did, where the prompt
+            # alone would leave them guessing.
+            ack = self._ack(event, status, user_id, waitlist_after, lang)
+            if ack:
+                try:
+                    await interaction.followup.send(ack, ephemeral=True)
+                except discord.HTTPException:
+                    pass
+
+    @staticmethod
+    def _ack(event, status: str, user_id: int, waitlist: list, lang: str) -> str | None:
+        """The private note for the member who answered, or None.
+
+        A party member who confirms sees themselves move to "Coming" and needs
+        nothing more. Declining costs the seat, and a waitlisted yes has no
+        visible effect yet, so both get a line saying what happens next.
+        """
+        if status == NO:
+            return i18n.t("rsvp.ack_declined", lang, title=event["title"])
+        position = next(
+            (i for i, s in enumerate(waitlist, start=1) if s["user_id"] == user_id),
+            None,
+        )
+        if position is None:
+            return None  # in the party, or just given a seat (announced publicly)
+        deadline = checkin.prompt_deadline(event)
+        key = "rsvp.ack_ready" if deadline else "rsvp.ack_ready_no_deadline"
+        return i18n.t(key, lang, title=event["title"], position=position, ts=deadline)

@@ -10,13 +10,16 @@ from types import SimpleNamespace
 
 import discord
 
-from bot import checkin, views_rsvp
+from bot import checkin, views, views_rsvp
 from bot.db import Database
 from bot.logic import COMPO_OPEN, COMPO_STANDARD, assign
+from bot.views import SignupView
 from bot.views_rsvp import RSVPView
 
 EVENT_ID = 9
 PROMOTED_3 = "📣 <@3>: a spot opened up, you're in the party for **Krao run**!"
+PROMOTED_4 = PROMOTED_3.replace("<@3>", "<@4>")
+CONFIRM_3 = PROMOTED_3 + " Tap ✅ on the check-in to keep it."
 
 
 def _prompt_id(posted_at: float) -> int:
@@ -72,6 +75,7 @@ class _World:
 
         monkeypatch.setattr(checkin, "refresh_event_message", fake_refresh)
         monkeypatch.setattr(views_rsvp, "refresh_event_message", fake_refresh)
+        monkeypatch.setattr(views, "refresh_event_message", fake_refresh)
 
     async def event(self, members, *, compo=COMPO_OPEN, size=2, starts_in=10 * 60):
         """`members` = [(user_id, role), ...] in join order.
@@ -108,22 +112,30 @@ class _World:
         )
         return [s["user_id"] for s in party], [s["user_id"] for s in waitlist]
 
-    async def press(self, user_id, status, prompt=None):
-        followups = []
+    def _interaction(self, user_id, message_id):
+        """A click by `user_id`; `.public` / `.private` collect the follow-ups."""
+        public, private = [], []
 
-        async def followup_send(content, **_):
-            followups.append(content)
+        async def followup_send(content, ephemeral=False, **_):
+            (private if ephemeral else public).append(content)
 
-        interaction = SimpleNamespace(
+        return SimpleNamespace(
             client=self.client,
             guild=None,
-            user=SimpleNamespace(id=user_id),
-            message=SimpleNamespace(id=prompt or self.prompt),
+            user=SimpleNamespace(id=user_id, display_name=f"u{user_id}"),
+            message=SimpleNamespace(id=message_id),
             response=_Response(),
             followup=SimpleNamespace(send=followup_send),
+            public=public,
+            private=private,
         )
+
+    async def press(self, user_id, status, prompt=None):
+        """Taps a check-in button; returns (response, public follow-ups)."""
+        interaction = self._interaction(user_id, prompt or self.prompt)
         await RSVPView("en")._respond(interaction, status)
-        return interaction.response, followups
+        self.private = interaction.private
+        return interaction.response, interaction.public
 
 
 def _run(tmp_path, monkeypatch, scenario):
@@ -145,31 +157,34 @@ def test_declining_frees_the_seat_and_promotes_the_next_in_line(tmp_path, monkey
     async def scenario(w):
         await w.event([(1, "dps"), (2, "dps"), (3, "dps")], starts_in=60 * 60)
         response, followups = await w.press(2, "no")
-        return await w.lists(), response, followups, w.redrawn
+        return await w.lists(), response, followups, w
 
-    (party, waitlist), response, followups, redrawn = _run(
-        tmp_path, monkeypatch, scenario
-    )
+    (party, waitlist), response, followups, w = _run(tmp_path, monkeypatch, scenario)
     assert party == [1, 3]
     assert waitlist == []
     # The prompt was redrawn and still lists who declined.
     fields = {f.name: f.value for f in response.edits[0]["embed"].fields}
     assert fields["❌ Can't make it (1)"] == "• <@2>"
-    assert followups == [
-        "📣 <@3>: a spot opened up, you're in the party for **Krao run**!"
+    # 3 was never asked to confirm a seat, so the ping says to do it now.
+    assert followups == [CONFIRM_3]
+    # The member who declined is told privately what that did.
+    assert w.private == [
+        "You're out of **Krao run**, so your place goes to someone else. "
+        "Changed your mind? Sign up again on the event post."
     ]
-    assert redrawn == [EVENT_ID]
+    assert w.redrawn == [EVENT_ID]
 
 
 def test_declining_with_nobody_waiting_just_leaves_the_seat_open(tmp_path, monkeypatch):
     async def scenario(w):
         await w.event([(1, "dps"), (2, "dps")], starts_in=60 * 60)
         _response, followups = await w.press(2, "no")
-        return await w.lists(), followups
+        return await w.lists(), followups, w.private
 
-    (party, waitlist), followups = _run(tmp_path, monkeypatch, scenario)
+    (party, waitlist), followups, private = _run(tmp_path, monkeypatch, scenario)
     assert (party, waitlist) == ([1], [])
     assert followups == []
+    assert len(private) == 1 and private[0].startswith("You're out of")
 
 
 def test_someone_not_signed_up_cannot_answer(tmp_path, monkeypatch):
@@ -187,11 +202,30 @@ def test_a_waitlisted_member_can_answer(tmp_path, monkeypatch):
     async def scenario(w):
         await w.event([(1, "dps"), (2, "dps"), (3, "dps")], starts_in=60 * 60)
         response, _ = await w.press(3, "yes")
-        return response
+        deadline = (await w.db.get_event(EVENT_ID))["starts_at"] - 15 * 60
+        return response, w.private, deadline
 
-    response = _run(tmp_path, monkeypatch, scenario)
+    response, private, deadline = _run(tmp_path, monkeypatch, scenario)
     fields = {f.name: f.value for f in response.edits[0]["embed"].fields}
     assert fields["🪑 Waitlist ready (1 of 1)"] == "• <@3>"
+    # Nothing visible happens to them yet, so they are told what to expect.
+    assert private == [
+        "You're marked ready for **Krao run** (#1 on the waitlist). "
+        f"From <t:{deadline}:t>, a seat with no reply goes to ready players "
+        "first. You'll be pinged if you get one."
+    ]
+
+
+def test_a_party_member_who_confirms_needs_no_extra_note(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps")], starts_in=60 * 60)
+        response, followups = await w.press(1, "yes")
+        return response, followups, w.private
+
+    response, followups, private = _run(tmp_path, monkeypatch, scenario)
+    fields = {f.name: f.value for f in response.edits[0]["embed"].fields}
+    assert fields["✅ Coming (1)"] == "• <@1>"
+    assert followups == [] and private == []
 
 
 # ----- the deadline -----
@@ -249,12 +283,13 @@ def test_a_waitlisted_yes_after_the_deadline_takes_a_silent_seat_at_once(
     async def scenario(w):
         await w.event([(1, "dps"), (2, "dps"), (3, "dps")])
         _response, followups = await w.press(3, "yes")
-        return await w.lists(), followups
+        return await w.lists(), followups, w.private
 
-    (party, waitlist), followups = _run(tmp_path, monkeypatch, scenario)
+    (party, waitlist), followups, private = _run(tmp_path, monkeypatch, scenario)
     assert (party, waitlist) == ([1, 3], [2])
     assert len(followups) == 1
     assert "<@3> takes the seat of <@2>" in followups[0]
+    assert private == []  # the public line already tells them they are in
 
 
 def test_standard_party_keeps_its_roles(tmp_path, monkeypatch):
@@ -288,9 +323,8 @@ def test_declining_after_the_deadline_announces_only_the_net_result(
     # 1's seat first falls to 3 (next in line), who is silent, so it goes on
     # to 4 in the same step. 3 ends where they started and is never pinged.
     assert (party, waitlist) == ([2, 4], [3])
-    assert followups == [
-        "📣 <@4>: a spot opened up, you're in the party for **Krao run**!"
-    ]
+    # 4 already confirmed, so the ping does not ask them to do it again.
+    assert followups == [PROMOTED_4]
 
 
 def test_an_old_prompt_takes_no_answers_after_a_reschedule(tmp_path, monkeypatch):
@@ -464,3 +498,80 @@ def test_the_check_in_pings_the_party_and_then_the_waitlist(tmp_path, monkeypatc
     )
     # The prompt says when unanswered seats can start to move.
     assert f"<t:{ev['starts_at'] - 15 * 60}:t>" in posted["embed"].description
+
+
+# ----- changes made on the event post while the check-in is out -----
+
+
+def test_signing_up_after_the_check_in_counts_as_coming(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps")], starts_in=60 * 60)
+        interaction = w._interaction(5, EVENT_ID)
+        event = await w.db.get_event(EVENT_ID)
+        await SignupView("en").perform_join(interaction, event, "dps", None)
+        return {r["user_id"]: r["status"] for r in await w.db.get_rsvps(EVENT_ID)}
+
+    assert _run(tmp_path, monkeypatch, scenario) == {5: "yes"}
+
+
+def test_signing_up_before_the_check_in_is_not_an_answer(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps")], starts_in=60 * 60)
+        await w.db.conn.execute(
+            "UPDATE events SET rsvp_sent = 0, rsvp_prompt_id = NULL"
+        )
+        interaction = w._interaction(5, EVENT_ID)
+        event = await w.db.get_event(EVENT_ID)
+        await SignupView("en").perform_join(interaction, event, "dps", None)
+        return await w.db.get_rsvps(EVENT_ID)
+
+    assert _run(tmp_path, monkeypatch, scenario) == []
+
+
+def test_leaving_after_the_deadline_seats_a_confirmed_player_in_one_step(
+    tmp_path, monkeypatch
+):
+    async def scenario(w):
+        # 3 is next in line but silent; 4 is behind them and ready.
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps"), (4, "dps")])
+        await w.db.set_rsvp(EVENT_ID, 2, "yes")
+        await w.db.set_rsvp(EVENT_ID, 4, "yes")
+        interaction = w._interaction(1, EVENT_ID)
+        await SignupView("en").leave_button.callback(interaction)
+        return await w.lists(), interaction, w
+
+    (party, waitlist), interaction, w = _run(tmp_path, monkeypatch, scenario)
+    assert (party, waitlist) == ([2, 4], [3])
+    assert interaction.public == [PROMOTED_4]
+    assert interaction.private == ["You've left the event. 👋"]
+    # The check-in was redrawn too, so it no longer lists the member who left.
+    assert [message_id for message_id, _ in w.channel.edits] == [w.prompt]
+
+
+def test_leaving_before_the_deadline_asks_the_next_in_line_to_confirm(
+    tmp_path, monkeypatch
+):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps")], starts_in=60 * 60)
+        interaction = w._interaction(1, EVENT_ID)
+        await SignupView("en").leave_button.callback(interaction)
+        return await w.lists(), interaction.public
+
+    (party, waitlist), public = _run(tmp_path, monkeypatch, scenario)
+    assert (party, waitlist) == ([2, 3], [])
+    assert public == [CONFIRM_3]
+
+
+def test_promotion_without_a_check_in_keeps_the_plain_wording(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps")], starts_in=60 * 60)
+        await w.db.conn.execute(
+            "UPDATE events SET rsvp_sent = 0, rsvp_prompt_id = NULL"
+        )
+        interaction = w._interaction(1, EVENT_ID)
+        await SignupView("en").leave_button.callback(interaction)
+        return interaction.public, w.channel.edits
+
+    public, prompt_edits = _run(tmp_path, monkeypatch, scenario)
+    assert public == [PROMOTED_3]
+    assert prompt_edits == []
