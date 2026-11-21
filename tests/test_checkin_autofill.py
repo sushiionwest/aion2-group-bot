@@ -279,20 +279,43 @@ def test_declining_after_the_deadline_announces_only_the_net_result(
         # 3 is next in line but silent; 4 is behind them and ready.
         await w.event([(1, "dps"), (2, "dps"), (3, "dps"), (4, "dps")])
         await w.db.set_rsvp(EVENT_ID, 1, "yes")
+        await w.db.set_rsvp(EVENT_ID, 2, "yes")
         await w.db.set_rsvp(EVENT_ID, 4, "yes")
-        # The pass first gives silent 2's seat to 4.
-        await checkin.timed_pass(w.client, EVENT_ID)
-        before = await w.lists()
         _response, followups = await w.press(1, "no")
-        return before, await w.lists(), followups
+        return await w.lists(), followups
 
-    before, (party, waitlist), followups = _run(tmp_path, monkeypatch, scenario)
-    assert before == ([1, 4], [3, 2])
-    # 1 left; 3 is next in line and gets the open seat.
-    assert (party, waitlist) == ([4, 3], [2])
+    (party, waitlist), followups = _run(tmp_path, monkeypatch, scenario)
+    # 1's seat first falls to 3 (next in line), who is silent, so it goes on
+    # to 4 in the same step. 3 ends where they started and is never pinged.
+    assert (party, waitlist) == ([2, 4], [3])
     assert followups == [
-        "📣 <@3>: a spot opened up, you're in the party for **Krao run**!"
+        "📣 <@4>: a spot opened up, you're in the party for **Krao run**!"
     ]
+
+
+def test_an_old_prompt_takes_no_answers_after_a_reschedule(tmp_path, monkeypatch):
+    async def scenario(w):
+        await w.event([(1, "dps"), (2, "dps"), (3, "dps")])
+        await w.db.set_rsvp(EVENT_ID, 1, "yes")
+        await w.db.set_rsvp(EVENT_ID, 2, "yes")
+        ev = await w.db.get_event(EVENT_ID)
+        # Moved a few minutes: answers are wiped and the check-in re-armed,
+        # but the new prompt has not been posted yet.
+        await w.db.update_event_details(
+            EVENT_ID,
+            title=ev["title"],
+            starts_at=ev["starts_at"] + 120,
+            description=None,
+            rearm_notifications=True,
+        )
+        response, followups = await w.press(3, "yes")
+        return response, followups, await w.lists(), await w.db.get_rsvps(EVENT_ID)
+
+    response, followups, lists, rsvps = _run(tmp_path, monkeypatch, scenario)
+    assert response.private == ["This RSVP is no longer active."]
+    assert followups == []
+    assert lists == ([1, 2], [3])
+    assert rsvps == []
 
 
 def test_no_seat_moves_once_the_event_has_started(tmp_path, monkeypatch):

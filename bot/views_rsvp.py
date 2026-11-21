@@ -67,11 +67,15 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
         user_id = interaction.user.id
         async with EVENT_LOCKS[message_id]:
             # Re-read under the lock: the event may have been cancelled,
-            # completed or given a newer prompt since the click.
+            # completed or given a newer prompt since the click. A reschedule
+            # wipes the answers and re-arms the check-in (rsvp_sent = 0); until
+            # the new prompt is posted, this one is for the old time and must
+            # not take answers that could move a seat.
             event = await db.get_event(message_id)
             if (
                 event is None
                 or event["status"] != "open"
+                or not event["rsvp_sent"]
                 or event["rsvp_prompt_id"] != interaction.message.id
             ):
                 await interaction.response.send_message(
