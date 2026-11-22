@@ -22,7 +22,7 @@ from ..actions import publish_event, register_absence
 from ..branding import BANNER_URL, brand
 from ..embeds import build_event_embed
 from ..errors import ModalErrorMixin, ViewErrorMixin
-from ..logic import COMPO_OPEN, COMPO_STANDARD
+from ..logic import COMPO_OPEN, COMPO_STANDARD, COMPO_SUPPORT
 from ..utils.permissions import member_is_admin, member_is_moderator
 from ..utils.time_parse import ParseError, parse_when
 from ..views import SignupView
@@ -33,6 +33,7 @@ from ..views import SignupView
 SETUPS = {
     "standard5": (COMPO_STANDARD, 5),
     "standard10": (COMPO_STANDARD, 10),
+    "support10": (COMPO_SUPPORT, 10),
     "open5": (COMPO_OPEN, 5),
     "open10": (COMPO_OPEN, 10),
     "open25": (COMPO_OPEN, 25),
@@ -511,7 +512,7 @@ class Panel(commands.Cog):
                 )
                 embed = build_event_embed(event, signups, classes, lang)
                 await channel.get_partial_message(event["message_id"]).edit(
-                    embed=embed, view=SignupView(lang)
+                    embed=embed, view=SignupView(lang, event["compo"])
                 )
                 events_done += 1
             except discord.HTTPException:

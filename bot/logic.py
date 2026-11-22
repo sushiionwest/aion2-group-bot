@@ -17,15 +17,40 @@ STANDARD_SIZE = sum(STANDARD_RATIO.values())  # 5
 MAX_CHARACTERS = 10
 
 COMPO_STANDARD = "standard"
-# Stored value for the no-role-limits mode. Any value other than "standard"
-# behaves as open, which keeps old rows created as "libre" working.
+# Support-heavy party of 10: 2 tanks / 4 support / 4 DPS. The support seats
+# are the "heal" role under another name (clerics and chanters alike), so the
+# stored sign-ups, profiles and buttons stay the same three roles.
+COMPO_SUPPORT = "support"
+SUPPORT_RATIO = {"tank": 2, "heal": 4, "dps": 4}
+# Stored value for the no-role-limits mode. Any value without per-role seats
+# below behaves as open, which keeps old rows created as "libre" working.
 COMPO_OPEN = "open"
+
+# Compositions with per-role seats: stored value -> seats for one unit of the
+# party. A party twice the unit's size has twice the seats.
+ROLE_RATIOS = {COMPO_STANDARD: STANDARD_RATIO, COMPO_SUPPORT: SUPPORT_RATIO}
+
+
+def has_role_seats(compo: str) -> bool:
+    """Whether the composition limits seats per role (anything else is open)."""
+    return compo in ROLE_RATIOS
+
+
+def role_slots(compo: str, size: int) -> dict | None:
+    """Per-role seats for a party, or None when the composition is open.
+
+    Standard: 5 -> 1/1/3, 10 (raid/BG) -> 2/2/6. Support: 10 -> 2/4/4.
+    """
+    ratio = ROLE_RATIOS.get(compo)
+    if ratio is None:
+        return None
+    groups = max(1, size // sum(ratio.values()))
+    return {role: n * groups for role, n in ratio.items()}
 
 
 def standard_slots(size: int) -> dict:
     """Per-role slots in standard mode: 5 -> 1/1/3, 10 (raid/BG) -> 2/2/6."""
-    groups = max(1, size // STANDARD_SIZE)
-    return {role: n * groups for role, n in STANDARD_RATIO.items()}
+    return role_slots(COMPO_STANDARD, size)
 
 
 MOVE_UP = "up"
@@ -76,8 +101,8 @@ def assign(compo: str, size: int, signups: list) -> tuple[list, list]:
     party: list = []
     waitlist: list = []
 
-    if compo == COMPO_STANDARD:
-        slots = standard_slots(size)
+    slots = role_slots(compo, size)
+    if slots is not None:
         taken = {role: 0 for role in ROLES}
         for s in signups:
             role = s["role"]
@@ -99,14 +124,15 @@ def assign(compo: str, size: int, signups: list) -> tuple[list, list]:
 def missing_slots(compo: str, size: int, signups: list) -> dict:
     """Open seats per role that still need filling, for display.
 
-    Standard mode only: returns `{role: remaining}` for each role not yet full
-    (filled roles are omitted). Open mode has no per-role slots, so it returns
-    an empty dict; the party's own count already shows how many seats are left.
+    Compositions with per-role seats only: returns `{role: remaining}` for each
+    role not yet full (filled roles are omitted). Open mode has no per-role
+    slots, so it returns an empty dict; the party's own count already shows how
+    many seats are left.
     """
-    if compo != COMPO_STANDARD:
+    slots = role_slots(compo, size)
+    if slots is None:
         return {}
     party, _waitlist = assign(compo, size, signups)
-    slots = standard_slots(size)
     filled = {role: 0 for role in ROLES}
     for s in party:
         filled[s["role"]] += 1

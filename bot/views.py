@@ -12,7 +12,7 @@ import time
 import discord
 
 from . import checkin, config, i18n
-from .embeds import ROLE_EMOJI, ROLE_LABEL, build_event_embed
+from .embeds import ROLE_EMOJI, build_event_embed, seat_label
 from .errors import ViewErrorMixin
 from .logic import (
     MOVE_DOWN,
@@ -128,12 +128,18 @@ class SignupView(ViewErrorMixin, discord.ui.View):
         "aion2:queue": "signup.btn_manage",
     }
 
-    def __init__(self, lang: str = "en"):
+    def __init__(self, lang: str = "en", compo: str | None = None):
         super().__init__(timeout=None)
         for child in self.children:
-            key = self._LABELS.get(getattr(child, "custom_id", None))
+            custom_id = getattr(child, "custom_id", None)
+            key = self._LABELS.get(custom_id)
             if key is not None:
                 child.label = i18n.t(key, lang)
+            elif custom_id == "aion2:heal":
+                # The seat's name depends on the party setup ("Support" in the
+                # support party). A label is fixed when the view is sent, so
+                # every place that sends this view passes the event's setup.
+                child.label = seat_label("heal", compo)
 
     # ----- Sign-up buttons -----
 
@@ -368,7 +374,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
                     "signup.already_role",
                     lang,
                     emoji=ROLE_EMOJI[role],
-                    label=ROLE_LABEL[role],
+                    label=seat_label(role, event["compo"]),
                 ),
                 ephemeral=True,
             )
@@ -391,14 +397,14 @@ class SignupView(ViewErrorMixin, discord.ui.View):
                     "signup.pick_switch",
                     lang,
                     emoji=ROLE_EMOJI[role],
-                    label=ROLE_LABEL[role],
+                    label=seat_label(role, event["compo"]),
                 )
                 if already_in_this_role
                 else i18n.t(
                     "signup.pick_join",
                     lang,
                     emoji=ROLE_EMOJI[role],
-                    label=ROLE_LABEL[role],
+                    label=seat_label(role, event["compo"]),
                 )
             )
             await interaction.response.send_message(intro, view=picker, ephemeral=True)
@@ -461,7 +467,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
                 "signup.joined",
                 lang,
                 emoji=ROLE_EMOJI[role],
-                label=ROLE_LABEL[role],
+                label=seat_label(role, event["compo"]),
                 who=who,
             )
         else:
@@ -475,7 +481,7 @@ class SignupView(ViewErrorMixin, discord.ui.View):
                 lang,
                 position=position,
                 emoji=ROLE_EMOJI[role],
-                label=ROLE_LABEL[role],
+                label=seat_label(role, event["compo"]),
                 who=who,
             )
         return message, party_before
@@ -514,7 +520,11 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             event["guild_id"], [s["user_id"] for s in signups]
         )
         embed = build_event_embed(event, signups, classes, lang)
-        await interaction.response.edit_message(embed=embed, view=self)
+        # A fresh view rather than `self`: after a restart `self` is the
+        # instance registered at startup, whose labels are the defaults, and
+        # sending it would rename this event's buttons.
+        view = SignupView(lang, event["compo"])
+        await interaction.response.edit_message(embed=embed, view=view)
         return signups
 
     async def announce_promoted(
@@ -565,7 +575,12 @@ class QueueSelect(discord.ui.Select):
     """Picks which sign-up the admin is about to move or remove."""
 
     def __init__(
-        self, ranked: list, party_ids: set, selected: int | None, lang: str = "en"
+        self,
+        ranked: list,
+        party_ids: set,
+        selected: int | None,
+        lang: str = "en",
+        compo: str | None = None,
     ):
         options = []
         for position, s in enumerate(ranked[:25], start=1):
@@ -573,7 +588,7 @@ class QueueSelect(discord.ui.Select):
             tag = i18n.t(
                 "signup.in_party" if in_party else "signup.waitlisted_tag", lang
             )
-            description = f"{tag} · {ROLE_LABEL[s['role']]}"
+            description = f"{tag} · {seat_label(s['role'], compo)}"
             if s["char_name"]:
                 description += f" · {s['char_name']}"
             options.append(
@@ -628,7 +643,7 @@ class QueueManageView(ViewErrorMixin, discord.ui.View):
             key = self._BUTTONS.get(getattr(child, "custom_id", None))
             if key is not None:
                 child.label = i18n.t(key, lang)
-        self.add_item(QueueSelect(ranked, party_ids, selected, lang))
+        self.add_item(QueueSelect(ranked, party_ids, selected, lang, event["compo"]))
 
     @discord.ui.button(
         emoji="⬆️", style=discord.ButtonStyle.primary, custom_id="queue:up", row=1
@@ -758,8 +773,11 @@ class RetiredButtonsView(ViewErrorMixin, discord.ui.View):
         await self._redraw(interaction)
 
     async def _redraw(self, interaction: discord.Interaction):
-        lang = await i18n.resolve_lang(interaction.client.db, interaction.guild)
-        await interaction.response.edit_message(view=SignupView(lang))
+        db = interaction.client.db
+        lang = await i18n.resolve_lang(db, interaction.guild)
+        event = await db.get_event(interaction.message.id)
+        compo = event["compo"] if event is not None else None
+        await interaction.response.edit_message(view=SignupView(lang, compo))
         await interaction.followup.send(
             i18n.t("signup.button_retired", lang), ephemeral=True
         )

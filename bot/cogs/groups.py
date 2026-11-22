@@ -12,7 +12,7 @@ from ..actions import post_event, publish_event, resolve_channel, type_ping_role
 from ..branding import brand
 from ..embeds import PRESENCE_ACTIVITY_EMOJI
 from ..errors import resilient_tick
-from ..logic import COMPO_OPEN, COMPO_STANDARD, assign
+from ..logic import COMPO_OPEN, COMPO_STANDARD, COMPO_SUPPORT, assign
 from ..utils.mentions import join_mentions, ping_permitted
 from ..utils.messages import parse_message_id
 from ..utils.permissions import member_is_moderator
@@ -47,6 +47,25 @@ async def event_type_autocomplete(interaction: discord.Interaction, current: str
         for row in await db.get_event_types(interaction.guild_id)
         if (is_staff or not row["staff_only"]) and needle in row["name"].casefold()
     ][:25]
+
+
+# `/event comp:` choices with fixed seats: value -> (composition, party size).
+# "standard5"/"standard10" are the same standard mode, only the size differs.
+FIXED_SETUPS = {
+    "standard5": (COMPO_STANDARD, 5),
+    "standard10": (COMPO_STANDARD, 10),
+    "support10": (COMPO_SUPPORT, 10),
+}
+
+
+def party_setup(choice: str, size: int | None) -> tuple[str, int]:
+    """The composition and party size behind a `/event comp:` choice.
+
+    `size` only applies to open parties; the other setups fix their own.
+    """
+    if choice == COMPO_OPEN:
+        return COMPO_OPEN, size or 5
+    return FIXED_SETUPS[choice]
 
 
 @app_commands.guild_only()
@@ -113,6 +132,10 @@ class Groups(commands.Cog):
                 name="Party of 10 (raid/BG) — 2 tanks / 2 heals / 6 DPS",
                 value="standard10",
             ),
+            app_commands.Choice(
+                name="Party of 10 (support) — 2 tanks / 4 support / 4 DPS",
+                value="support10",
+            ),
             app_commands.Choice(name="Open — no role limits", value=COMPO_OPEN),
         ],
     )
@@ -150,14 +173,7 @@ class Groups(commands.Cog):
                 await interaction.response.send_message(str(err), ephemeral=True)
                 return
 
-        # "standard5"/"standard10" are the same standard mode, only size differs.
-        if comp.value == COMPO_OPEN:
-            comp_mode, party_size = COMPO_OPEN, size or 5
-        else:
-            comp_mode, party_size = (
-                COMPO_STANDARD,
-                10 if comp.value == "standard10" else 5,
-            )
+        comp_mode, party_size = party_setup(comp.value, size)
 
         # Multi-group sieges are a flat Open roster shown split into groups;
         # `size` is then the per-group size, so the total is size × groups.

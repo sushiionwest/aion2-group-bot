@@ -8,6 +8,11 @@ All notable changes to Kisk are documented here. The format follows
 
 ### Added
 
+- **Support party of 10.** A new party setup, in the panel and in `/event`:
+  2 tanks / 4 support / 4 DPS. On these events the Heal button and seats are
+  called "Support" (clerics and chanters sign up there); a freed or unanswered
+  seat only goes to a waitlisted player of the same role, as in the other
+  role-based setups.
 - **Field boss timers restart on their own.** After a reported spawn passes,
   the board keeps counting to the next one as an estimate (marked `≈`) until a
   member reports the real kill; after two unreported respawns it reads "not

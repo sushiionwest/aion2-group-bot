@@ -11,7 +11,7 @@ A silent player is never replaced by another silent one: the swap only happens
 when it puts a confirmed player in the seat.
 """
 
-from ..logic import COMPO_STANDARD, assign, signup_priority
+from ..logic import assign, has_role_seats, signup_priority
 
 YES = "yes"
 NO = "no"
@@ -68,11 +68,11 @@ def autofill_swaps(
     queue order, ready to be stored as priorities.
 
     Each waitlisted "yes", in waitlist order, takes the seat of a party member
-    who has not said yes; in standard composition only one with the same role,
-    so the party keeps its tanks and healers. The two trade places in the
-    queue, so nobody else moves and the player who lost the seat stands where
-    the newcomer was. Among several unanswered seats the most recent sign-up
-    gives way first.
+    who has not said yes; where the composition has per-role seats only one
+    with the same role, so the party keeps its tanks and healers. The two trade
+    places in the queue, so nobody else moves and the player who lost the seat
+    stands where the newcomer was. Among several unanswered seats the most
+    recent sign-up gives way first.
     """
     ranked = sorted(signups, key=signup_priority, reverse=True)
     ranking = [s["user_id"] for s in ranked]
@@ -85,10 +85,11 @@ def autofill_swaps(
     replaceable.sort(key=lambda s: responses.get(s["user_id"]) != NO)
     ready = [s for s in waitlist if responses.get(s["user_id"]) == YES]
 
+    same_role_only = has_role_seats(compo)
     swaps: list[tuple[int, int]] = []
     for newcomer in ready:
         for seat in replaceable:
-            if compo != COMPO_STANDARD or seat["role"] == newcomer["role"]:
+            if not same_role_only or seat["role"] == newcomer["role"]:
                 break
         else:
             continue  # no unanswered seat this player can fill

@@ -71,7 +71,10 @@ async def post_event(
         mentions = discord.AllowedMentions.none()
     # Send the message first so we know its ID, which is our key.
     message = await channel.send(
-        content=content, embed=embed, view=SignupView(lang), allowed_mentions=mentions
+        content=content,
+        embed=embed,
+        view=SignupView(lang, event["compo"]),
+        allowed_mentions=mentions,
     )
     try:
         await client.db.create_event(message_id=message.id, **event)

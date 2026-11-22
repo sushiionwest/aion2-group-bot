@@ -17,6 +17,8 @@ PANEL_KEYS = {
     "panel.setup_desc_standard5": {},
     "panel.setup_label_standard10": {},
     "panel.setup_desc_standard10": {},
+    "panel.setup_label_support10": {},
+    "panel.setup_desc_support10": {},
     "panel.setup_label_open5": {},
     "panel.setup_desc_open5": {},
     "panel.setup_label_open10": {},
