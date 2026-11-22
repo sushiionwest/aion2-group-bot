@@ -8,6 +8,10 @@ All notable changes to Kisk are documented here. The format follows
 
 ### Added
 
+- **Field boss timers restart on their own.** After a reported spawn passes,
+  the board keeps counting to the next one as an estimate (marked `≈`) until a
+  member reports the real kill; after two unreported respawns it reads "not
+  set" again.
 - **Boss timers.** `/timers post` puts a live board in a channel: field bosses
   (Gartua, Lagta, Dartan, Kashapa) are reported by members with a button, and
   abyss bosses and the Spacetime Rift follow the game server's clock. Times

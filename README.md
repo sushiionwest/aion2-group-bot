@@ -443,6 +443,9 @@ among mains). No command to re-run — pin it and it stays current.
   each kill, which only players see. Anyone taps a boss's button under the
   board and types the countdown from the in-game Field Boss list (`5:42`), or
   leaves it empty when the boss was just killed. The board shows who set it.
+  Once that spawn passes, the timer restarts on its own as an estimate (marked
+  `≈`), assuming the boss died as it spawned; a new report replaces the guess.
+  After two unreported respawns the timer goes back to "not set".
 * **Abyss bosses** and the **Spacetime Rift** follow the game server's clock,
   so Kisk works their times out on its own.
 
@@ -459,6 +462,8 @@ the channel stays clean.
   (default `America/Los_Angeles`) and the ping lead time; with no option it
   shows the current setup.
 * `/timers respawn boss: hours:` changes a field boss's respawn time.
+* `/timers clear boss:` wipes one field boss's timer, or all of them (after a
+  maintenance, say).
 * `/timers schedule timer: days: times:` changes a clock timer, e.g.
   `mon,thu,sat` and `21:30`, or `daily` and `01:00/3h`.
 
