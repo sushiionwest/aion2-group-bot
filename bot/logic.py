@@ -12,6 +12,36 @@ ROLES = ("tank", "heal", "dps")
 STANDARD_RATIO = {"tank": 1, "heal": 1, "dps": 3}
 STANDARD_SIZE = sum(STANDARD_RATIO.values())  # 5
 
+# Which seats a class may take on an event with per-role seats. A class that
+# is not listed (one added to the game later) may take any seat, so adding it
+# to config.CLASS_EMOJI stays enough to make it usable.
+CLASS_ROLES = {
+    "Templar": ("tank",),
+    "Gladiator": ("dps",),
+    "Assassin": ("dps",),
+    "Ranger": ("dps",),
+    "Sorcerer": ("dps",),
+    "Spiritmaster": ("dps",),
+    "Cleric": ("heal",),
+    "Chanter": ("heal",),
+}
+
+
+def roles_for_class(char_class: str) -> tuple:
+    """The roles a class may sign up as; every role for an unlisted class."""
+    return CLASS_ROLES.get(char_class, ROLES)
+
+
+def class_fits_role(char_class: str, role: str) -> bool:
+    """Whether a character of this class may take a seat of this role."""
+    return role in roles_for_class(char_class)
+
+
+def classes_for_role(role: str) -> list:
+    """The listed classes that may take a seat of this role."""
+    return [name for name, roles in CLASS_ROLES.items() if role in roles]
+
+
 # How many characters one member may register. Discord caps a dropdown at 25
 # options; well under that keeps the character menus short enough to be useful.
 MAX_CHARACTERS = 10

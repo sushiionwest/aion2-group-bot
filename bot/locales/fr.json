@@ -94,6 +94,8 @@
   "signup.char_gone": "Ce personnage n'existe plus.",
   "signup.bringing": "🔁 Tu amènes **{name}** à **{title}**.",
   "signup.already_role": "Tu es déjà inscrit en {emoji} **{label}**.",
+  "signup.class_refused": "🚫 Les places {label} de cet événement sont réservées à : {classes}. **{name}** est {char_class}, inscris-toi plutôt en {allowed}.",
+  "signup.class_refused_many": "🚫 Les places {label} de cet événement sont réservées à : {classes}. Aucun de tes personnages n'en fait partie, choisis un autre rôle.",
   "signup.pick_switch": "Tu es déjà {emoji} **{label}** — choisis le personnage que tu amènes :",
   "signup.pick_join": "Inscription en {emoji} **{label}**. Quel personnage amènes-tu ?",
   "signup.pick_placeholder": "Quel personnage amènes-tu ?",

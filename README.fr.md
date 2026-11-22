@@ -83,6 +83,8 @@ Pensé pour le contenu de groupe plus large comme les raids et les champs de bat
 
 Un groupe de dix axé sur le soutien. Sur ces événements, le bouton et les places Heal s'appellent **Support** ; les clercs et les aèdes s'y inscrivent.
 
+Sur ces configurations à rôles, un personnage enregistré ne peut prendre qu'une place adaptée à sa classe : Templar en tank ; Cleric et Chanter en heal / support ; Gladiator, Assassin, Ranger, Sorcerer et Spiritmaster en DPS. Les membres sans personnage enregistré ne sont pas vérifiés.
+
 **Ouvert**
 
 Premier arrivé, premier servi.

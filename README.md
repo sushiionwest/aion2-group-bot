@@ -98,6 +98,8 @@ Designed for larger group content such as raids and battlegrounds.
 
 A support-heavy ten. On these events the Heal button and seats read **Support**, and clerics and chanters both sign up there.
 
+On these role-based setups a registered character can only take a seat its class fits: Templar is a tank; Cleric and Chanter are heal / support; Gladiator, Assassin, Ranger, Sorcerer and Spiritmaster are DPS. Members who have not registered a character are not checked.
+
 **Open**
 
 First come, first served.

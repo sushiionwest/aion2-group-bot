@@ -18,7 +18,11 @@ from .logic import (
     MOVE_DOWN,
     MOVE_UP,
     assign,
+    class_fits_role,
+    classes_for_role,
+    has_role_seats,
     reorder_priorities,
+    roles_for_class,
     signup_priority,
 )
 from .utils.mentions import join_mentions
@@ -365,6 +369,18 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             return
 
         characters = await db.get_profiles(event["guild_id"], interaction.user.id)
+        if has_role_seats(event["compo"]) and characters:
+            # Seats are per role here, so the character has to fit the seat:
+            # a sorcerer in the tank seat keeps a real tank on the waitlist.
+            # Members with no registered character are taken at their word.
+            fitting = [c for c in characters if class_fits_role(c["char_class"], role)]
+            if not fitting:
+                await interaction.response.send_message(
+                    self._class_refusal(event, role, characters, lang),
+                    ephemeral=True,
+                )
+                return
+            characters = fitting
         existing = await db.get_signup(event["message_id"], interaction.user.id)
         already_in_this_role = existing is not None and existing["role"] == role
 
@@ -418,6 +434,30 @@ class SignupView(ViewErrorMixin, discord.ui.View):
             await refresh_event_message(interaction.client, event)
             await checkin.sync_prompt(interaction.client, event)
             await self.announce_promoted(interaction, event, party_before)
+
+    @staticmethod
+    def _class_refusal(event, role: str, characters: list, lang: str) -> str:
+        """Why none of the member's characters can take this seat."""
+        compo = event["compo"]
+        label = seat_label(role, compo)
+        classes = ", ".join(classes_for_role(role))
+        if len(characters) > 1:
+            return i18n.t(
+                "signup.class_refused_many", lang, label=label, classes=classes
+            )
+        character = characters[0]
+        allowed = " / ".join(
+            seat_label(r, compo) for r in roles_for_class(character["char_class"])
+        )
+        return i18n.t(
+            "signup.class_refused",
+            lang,
+            label=label,
+            classes=classes,
+            name=character["char_name"],
+            char_class=character["char_class"],
+            allowed=allowed,
+        )
 
     async def perform_join(
         self,

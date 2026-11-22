@@ -94,6 +94,8 @@
   "signup.char_gone": "That character doesn't exist any more.",
   "signup.bringing": "🔁 You're bringing **{name}** to **{title}**.",
   "signup.already_role": "You're already signed up as {emoji} **{label}**.",
+  "signup.class_refused": "🚫 {label} seats on this event are for: {classes}. **{name}** is a {char_class}, so sign up as {allowed} instead.",
+  "signup.class_refused_many": "🚫 {label} seats on this event are for: {classes}. None of your characters is one of those, so pick another role.",
   "signup.pick_switch": "You're already {emoji} **{label}** — pick the character you're bringing:",
   "signup.pick_join": "Signing up as {emoji} **{label}**. Which character are you bringing?",
   "signup.pick_placeholder": "Which character are you bringing?",
