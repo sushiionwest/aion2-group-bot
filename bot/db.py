@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS events (
     title         TEXT    NOT NULL,
     activity      TEXT    NOT NULL,               -- Dungeon / PvP / ...
     description   TEXT,
-    compo         TEXT    NOT NULL,               -- 'standard' or 'open'
+    compo         TEXT    NOT NULL,               -- 'standard', 'support' or 'open'
     size          INTEGER NOT NULL,
     starts_at     INTEGER,                        -- UTC timestamp, NULL = no schedule
     status        TEXT    NOT NULL DEFAULT 'open',-- 'open', 'cancelled' or 'done'

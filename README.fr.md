@@ -63,7 +63,7 @@ Comme le kisk en jeu, c'est le **point de ralliement que vous posez avant le com
 
 ### 👥 Compositions de groupe
 
-Trois configurations intégrées sont disponibles :
+Quatre configurations intégrées sont disponibles :
 
 **Groupe de 5**
 
@@ -76,6 +76,14 @@ Composition de donjon classique.
 `2 Tanks / 2 Heals / 6 DPS`
 
 Pensé pour le contenu de groupe plus large comme les raids et les champs de bataille.
+
+**Groupe de 10 — support**
+
+`2 Tanks / 4 Supports / 4 DPS`
+
+Un groupe de dix axé sur le soutien. Sur ces événements, le bouton et les places Heal s'appellent **Support** ; les clercs et les aèdes s'y inscrivent.
+
+Sur ces configurations à rôles, un personnage enregistré ne peut prendre qu'une place adaptée à sa classe : Templar en tank ; Cleric et Chanter en heal / support ; Gladiator, Assassin, Ranger, Sorcerer et Spiritmaster en DPS. Les membres sans personnage enregistré ne sont pas vérifiés.
 
 **Ouvert**
 

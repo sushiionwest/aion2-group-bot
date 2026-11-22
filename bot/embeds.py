@@ -5,12 +5,13 @@ import discord
 from . import config, i18n
 from .branding import activity_icon_url, brand
 from .logic import (
-    COMPO_STANDARD,
+    COMPO_SUPPORT,
     ROLES,
     assign,
+    has_role_seats,
     missing_slots,
+    role_slots,
     split_groups,
-    standard_slots,
 )
 from .utils.rsvp import checkin_tally
 from .utils.text import truncate_field
@@ -40,6 +41,25 @@ ROLE_EMOJI = {
     "dps": config.EMOJI_DPS,
 }
 ROLE_LABEL = {"tank": "Tank", "heal": "Heal", "dps": "DPS"}
+# What a seat is called on an event, where the composition renames one. The
+# support party's "heal" seats take clerics and chanters alike, so they read
+# "Support" there; a character's own role (profiles, pickers) stays ROLE_LABEL.
+SEAT_LABEL = {COMPO_SUPPORT: {"heal": "Support"}}
+
+
+def seat_label(role: str, compo: str | None = None) -> str:
+    """The name of a role's seat on an event with this composition."""
+    return SEAT_LABEL.get(compo, {}).get(role, ROLE_LABEL[role])
+
+
+def same_role_note(event, lang: str = "en") -> str:
+    """The sentence saying seats only move within a role, or "" for open."""
+    compo = _row_get(event, "compo")
+    if not has_role_seats(compo):
+        return ""
+    key = "rsvp.same_role_support" if compo == COMPO_SUPPORT else "rsvp.same_role"
+    return i18n.t(key, lang)
+
 
 COLOUR_OPEN = discord.Colour.blurple()
 COLOUR_FULL = discord.Colour.green()
@@ -158,7 +178,7 @@ def build_event_embed(
                 lang,
                 n=missing[role],
                 emoji=ROLE_EMOJI[role],
-                label=ROLE_LABEL[role],
+                label=seat_label(role, event["compo"]),
             )
             for role in ROLES
             if role in missing
@@ -179,7 +199,8 @@ def build_event_embed(
 
     # Share the total-embed budget across the composition and waitlist fields so
     # a maxed siege stays under Discord's 6000-char ceiling (see EMBED_FIELD_BUDGET).
-    if event["compo"] == COMPO_STANDARD:
+    slots = role_slots(event["compo"], event["size"])
+    if slots is not None:
         comp_fields = len(ROLES)
     elif (_row_get(event, "groups") or 1) > 1:
         comp_fields = event["groups"]
@@ -187,13 +208,12 @@ def build_event_embed(
         comp_fields = 1
     field_cap = min(1024, EMBED_FIELD_BUDGET // (comp_fields + (1 if waitlist else 0)))
 
-    if event["compo"] == COMPO_STANDARD:
-        slots = standard_slots(event["size"])
+    if slots is not None:
         by_role = {role: [s for s in party if s["role"] == role] for role in ROLES}
         for role in ROLES:
             embed.add_field(
                 name=(
-                    f"{ROLE_EMOJI[role]} {ROLE_LABEL[role]} "
+                    f"{ROLE_EMOJI[role]} {seat_label(role, event['compo'])} "
                     f"({len(by_role[role])}/{slots[role]})"
                 ),
                 value=_role_field_value(
@@ -265,14 +285,6 @@ def build_event_embed(
     return embed
 
 
-def _is_standard(event) -> bool:
-    """Whether the event has per-role seats (rows and plain dicts alike)."""
-    try:
-        return event["compo"] == COMPO_STANDARD
-    except (KeyError, IndexError):
-        return False
-
-
 def build_rsvp_embed(
     event,
     party: list,
@@ -298,8 +310,9 @@ def build_rsvp_embed(
     hint = i18n.t("rsvp.body_hint", lang)
     if deadline is not None:
         hint += "\n" + i18n.t("rsvp.deadline_hint", lang, ts=deadline)
-        if _is_standard(event):
-            hint += " " + i18n.t("rsvp.same_role", lang)
+        note = same_role_note(event, lang)
+        if note:
+            hint += " " + note
     embed = discord.Embed(
         title=f"{emoji} " + i18n.t("rsvp.title", lang, title=event["title"]),
         description=f"**{event['activity']}**{when}\n{hint}",

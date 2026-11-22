@@ -5,8 +5,9 @@ import time
 import discord
 
 from . import checkin, i18n
+from .embeds import same_role_note
 from .errors import ViewErrorMixin
-from .logic import COMPO_STANDARD, assign
+from .logic import assign
 from .utils.rsvp import NO, YES
 from .views_common import EVENT_LOCKS, refresh_event_message
 
@@ -156,6 +157,7 @@ class RSVPView(ViewErrorMixin, discord.ui.View):
         deadline = checkin.prompt_deadline(event)
         key = "rsvp.ack_ready" if deadline else "rsvp.ack_ready_no_deadline"
         note = i18n.t(key, lang, title=event["title"], position=position, ts=deadline)
-        if deadline and event["compo"] == COMPO_STANDARD:
-            note += " " + i18n.t("rsvp.same_role", lang)
+        role_rule = same_role_note(event, lang)
+        if deadline and role_rule:
+            note += " " + role_rule
         return note

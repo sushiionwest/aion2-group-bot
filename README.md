@@ -78,7 +78,7 @@ the panel's dropdown and `/event`'s type, straight from Discord:
 
 ### 👥 Party compositions
 
-Three built-in setups are available:
+Four built-in setups are available:
 
 **Party of 5**
 
@@ -91,6 +91,14 @@ Classic dungeon composition.
 `2 Tanks / 2 Heals / 6 DPS`
 
 Designed for larger group content such as raids and battlegrounds.
+
+**Party of 10 — support**
+
+`2 Tanks / 4 Support / 4 DPS`
+
+A support-heavy ten. On these events the Heal button and seats read **Support**, and clerics and chanters both sign up there.
+
+On these role-based setups a registered character can only take a seat its class fits: Templar is a tank; Cleric and Chanter are heal / support; Gladiator, Assassin, Ranger, Sorcerer and Spiritmaster are DPS. Members who have not registered a character are not checked.
 
 **Open**
 
