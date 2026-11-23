@@ -9,12 +9,12 @@ them.
 
 import discord
 
-from . import config
+from . import config, theme
 
 # Bump when the artwork changes: the asset URLs are otherwise stable, so a
 # changed image would keep serving from Discord's image cache until it expires.
 # The `?v=` below makes Discord treat a new version as a fresh URL and refetch.
-ASSET_VERSION = "2"
+ASSET_VERSION = "3"
 
 
 def asset_url(name: str) -> str:
@@ -54,5 +54,5 @@ def activity_icon_url(activity: str) -> str:
 
 def brand(embed: discord.Embed) -> discord.Embed:
     """Stamps an embed with Kisk's author line and logo. Returns it for chaining."""
-    embed.set_author(name="Kisk", icon_url=LOGO_URL)
+    embed.set_author(name=theme.NAME, icon_url=LOGO_URL)
     return embed

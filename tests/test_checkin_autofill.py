@@ -17,7 +17,7 @@ from bot.views import SignupView
 from bot.views_rsvp import RSVPView
 
 EVENT_ID = 9
-PROMOTED_3 = "📣 <@3>: a spot opened up, you're in the party for **Krao run**!"
+PROMOTED_3 = "📣 <@3>: a spot opened up, you're in the party for **Krao run**! ♡"
 PROMOTED_4 = PROMOTED_3.replace("<@3>", "<@4>")
 CONFIRM_3 = PROMOTED_3 + " Tap ✅ on the check-in to keep it."
 
@@ -178,8 +178,8 @@ def test_declining_frees_the_seat_and_promotes_the_next_in_line(tmp_path, monkey
     assert followups == [CONFIRM_3]
     # The member who declined is told privately what that did.
     assert w.private == [
-        "You're out of **Krao run**, so your place goes to someone else. "
-        "Changed your mind? Sign up again on the event post."
+        "Aw, okay! You're out of **Krao run**, so your place goes to someone else. "
+        "Changed your mind? Sign up again on the event post. ♡"
     ]
     assert w.redrawn == [EVENT_ID]
 
@@ -193,7 +193,7 @@ def test_declining_with_nobody_waiting_just_leaves_the_seat_open(tmp_path, monke
     (party, waitlist), followups, private = _run(tmp_path, monkeypatch, scenario)
     assert (party, waitlist) == ([1], [])
     assert followups == []
-    assert len(private) == 1 and private[0].startswith("You're out of")
+    assert len(private) == 1 and "You're out of" in private[0]
 
 
 def test_someone_not_signed_up_cannot_answer(tmp_path, monkeypatch):
@@ -219,7 +219,7 @@ def test_a_waitlisted_member_can_answer(tmp_path, monkeypatch):
     assert fields["🪑 Waitlist ready (1 of 1)"] == "• <@3>"
     # Nothing visible happens to them yet, so they are told what to expect.
     assert private == [
-        "You're marked ready for **Krao run** (#1 on the waitlist). "
+        "You're marked ready for **Krao run** ✨ (#1 on the waitlist). "
         f"From <t:{deadline}:t>, a seat with no reply goes to ready players "
         "first. You'll be pinged if you get one."
     ]
@@ -553,7 +553,7 @@ def test_leaving_after_the_deadline_seats_a_confirmed_player_in_one_step(
     (party, waitlist), interaction, w = _run(tmp_path, monkeypatch, scenario)
     assert (party, waitlist) == ([2, 4], [3])
     assert interaction.public == [PROMOTED_4]
-    assert interaction.private == ["You've left the event. 👋"]
+    assert interaction.private == ["You've left the event. See you next time! 👋 ♡"]
     # The check-in was redrawn too, so it no longer lists the member who left.
     assert [message_id for message_id, _ in w.channel.edits] == [w.prompt]
 

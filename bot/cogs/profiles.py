@@ -11,7 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..branding import brand
 from ..embeds import ROLE_EMOJI, ROLE_LABEL
 from ..logic import MAX_CHARACTERS, ROLES
@@ -229,7 +229,7 @@ class Profile(commands.GroupCog, name="profile"):
         embed = discord.Embed(
             title=title,
             description="\n".join(character_line(row) for row in characters),
-            colour=discord.Colour.blurple(),
+            colour=theme.PINK,
         )
         brand(embed)
         embed.set_footer(text=i18n.t("profile.show_footer", lang, n=len(characters)))
@@ -395,7 +395,7 @@ class Roster(commands.Cog):
                 chars=len(characters),
             ),
             description=text,
-            colour=discord.Colour.blurple(),
+            colour=theme.PINK,
         )
         brand(embed)
         await interaction.response.send_message(embed=embed, ephemeral=True)

@@ -247,8 +247,9 @@ clearing the time field drops the schedule.
 
 ### 🎨 Look & feel
 
-Embeds carry a consistent **Kisk** author line, the `/panel` shows the Kisk
-banner, and each event gets a banner matching its **type** (Dungeon, Raid, PvP,
+Embeds carry a consistent **Kawaii Kisk ♡** author line and take their colour
+from one pastel palette (`bot/theme.py`; change the look there), the `/panel`
+shows the Kisk banner (`assets/banner.svg`, pink like `assets/avatar.svg`), and each event gets a banner matching its **type** (Dungeon, Raid, PvP,
 Rift, Abyss, Battleground). The artwork is served by URL from `ASSET_BASE_URL`
 (the repo's public assets by default). The banners' source is
 `assets/banners/*.svg`; render them to PNG once with:

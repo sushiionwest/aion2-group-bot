@@ -9,7 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..branding import RECRUIT_BANNER_URL, brand
 from ..errors import ModalErrorMixin, ViewErrorMixin
 from ..utils.permissions import member_is_admin
@@ -96,7 +96,7 @@ class ApplicationSetupView(ViewErrorMixin, discord.ui.View):
                 description=i18n.t(
                     "recruit.summary_body", self.lang, class_line=cls, role_line=role
                 ),
-                colour=discord.Colour.blurple(),
+                colour=theme.PINK,
             )
         )
 
@@ -276,7 +276,7 @@ class Recruitment(commands.Cog):
             discord.Embed(
                 title=i18n.t("recruit.desk_title", lang, guild=guild_name),
                 description=i18n.t("recruit.desk_body", lang),
-                colour=discord.Colour.green(),
+                colour=theme.MINT,
             )
         )
         embed.set_image(url=RECRUIT_BANNER_URL)
@@ -489,7 +489,7 @@ class Recruitment(commands.Cog):
             discord.Embed(
                 title=i18n.t("recruit.dm_title", lang, guild=guild.name),
                 description=i18n.t("recruit.dm_body", lang),
-                colour=discord.Colour.blurple(),
+                colour=theme.PINK,
             )
         )
 
@@ -573,7 +573,7 @@ class Recruitment(commands.Cog):
                     cls=app["char_class"],
                     role=ROLE_LABELS.get(app["role"], app["role"]),
                 ),
-                colour=discord.Colour.blurple(),
+                colour=theme.PINK,
             )
         )
         for key, field in (

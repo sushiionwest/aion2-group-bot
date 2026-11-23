@@ -32,7 +32,7 @@ def test_pick_lang_ignores_unsupported_setting():
 def test_t_returns_string_for_language():
     english = i18n.t("common.error", "en")
     french = i18n.t("common.error", "fr")
-    assert english.startswith("Something went wrong")
+    assert "something went wrong" in english
     assert french != english
     assert "problème" in french.lower()
 

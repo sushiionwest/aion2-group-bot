@@ -16,7 +16,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..branding import brand
 from ..embeds import ROLE_EMOJI, ROLE_LABEL
 from ..errors import ViewErrorMixin, resilient_tick
@@ -64,7 +64,7 @@ def build_lfg_embed(pool: list, available: list, lang: str, now: int) -> discord
     embed = discord.Embed(
         title="🔎 " + i18n.t("lfg.title", lang),
         description=i18n.t("lfg.hint", lang),
-        colour=discord.Colour.blurple(),
+        colour=theme.PINK,
     )
     brand(embed)
 

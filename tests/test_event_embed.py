@@ -37,12 +37,12 @@ def party_text(embed) -> str:
 
 def test_needs_summary_lists_the_open_roles():
     embed = build_event_embed(EVENT, [signup(10, "tank")])
-    assert "Needs:" in (embed.description or "")
+    assert "Still looking for:" in (embed.description or "")
 
 
 def test_open_seats_are_shown_in_role_fields():
     embed = build_event_embed(EVENT, [signup(10, "tank")])
-    assert "◦ *open*" in party_text(embed)
+    assert "♡ *open*" in party_text(embed)
 
 
 def test_full_standard_party_has_no_needs_summary():
@@ -54,13 +54,13 @@ def test_full_standard_party_has_no_needs_summary():
         signup(5, "dps"),
     ]
     embed = build_event_embed(EVENT, full)
-    assert "Needs" not in (embed.description or "")
+    assert "Still looking for" not in (embed.description or "")
     assert "open" not in party_text(embed)
 
 
 def test_cancelled_event_has_no_needs_summary():
     embed = build_event_embed({**EVENT, "status": "cancelled"}, [signup(10, "tank")])
-    assert "Needs" not in (embed.description or "")
+    assert "Still looking for" not in (embed.description or "")
 
 
 def test_a_big_waitlist_stays_within_the_discord_field_limit():

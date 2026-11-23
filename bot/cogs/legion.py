@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import i18n
+from .. import i18n, theme
 from ..actions import fmt_absence_ts, register_absence
 from ..branding import brand
 from ..errors import ModalErrorMixin
@@ -36,7 +36,7 @@ class AnnounceModal(ModalErrorMixin, discord.ui.Modal):
         embed = discord.Embed(
             title=f"📯 {self.announce_title.value}",
             description=self.content.value,
-            colour=discord.Colour.gold(),
+            colour=theme.BUTTER,
         )
         brand(embed)
         embed.set_footer(
@@ -120,7 +120,7 @@ class Legion(commands.Cog):
         embed = discord.Embed(
             title=i18n.t("absences.title", lang),
             description="\n".join(lines),
-            colour=discord.Colour.orange(),
+            colour=theme.PEACH,
         )
         brand(embed)
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -228,7 +228,7 @@ class Legion(commands.Cog):
         embed = discord.Embed(
             title=i18n.t("welcome_join.title", lang),
             description=i18n.t("welcome_join.body", lang),
-            colour=discord.Colour.blurple(),
+            colour=theme.PINK,
         )
         brand(embed)
         try:

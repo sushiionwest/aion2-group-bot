@@ -17,7 +17,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..actions import publish_event, register_absence
 from ..branding import BANNER_URL, brand
 from ..embeds import build_event_embed
@@ -153,7 +153,7 @@ class EventSetupView(ViewErrorMixin, discord.ui.View):
                 label=label,
                 description=description,
             ),
-            colour=discord.Colour.blurple(),
+            colour=theme.PINK,
         )
 
     @discord.ui.button(
@@ -348,7 +348,7 @@ def _panel_embed(settings, lang: str) -> discord.Embed:
             dps=config.EMOJI_DPS,
             where=where,
         ),
-        colour=discord.Colour.blurple(),
+        colour=theme.PINK,
     )
     brand(embed)
     embed.set_image(url=BANNER_URL)

@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import i18n
+from .. import i18n, theme
 from ..branding import brand
 from ..errors import ModalErrorMixin, ViewErrorMixin, resilient_tick
 from ..utils.boss_timers import (
@@ -88,9 +88,7 @@ def build_timers_embed(rows: dict, tz: ZoneInfo, lang: str, now: int) -> discord
     """The board: one section per group, one line per timer. Countdowns are
     Discord timestamps, so they tick on their own and the message only needs
     an edit when a timer rolls over."""
-    embed = discord.Embed(
-        title="⏱️ " + i18n.t("timers.title", lang), colour=discord.Colour.blurple()
-    )
+    embed = discord.Embed(title="⏱️ " + i18n.t("timers.title", lang), colour=theme.PINK)
     for group in GROUPS:
         lines = [
             _timer_line(
