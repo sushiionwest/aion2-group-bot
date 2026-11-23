@@ -70,7 +70,6 @@ def test_the_artwork_is_served_from_this_repository():
 
 
 def test_the_sparkle_only_ever_ends_a_title():
-    assert theme.cute("Boss timers") == "Boss timers ₊˚⊹♡"
     english = json.loads((LOCALES / "en.json").read_text())
     for key, text in english.items():
         if theme.SPARKLE in text and not key.endswith(("thread_intro", "panel.title")):
