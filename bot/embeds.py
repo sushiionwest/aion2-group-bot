@@ -2,7 +2,7 @@
 
 import discord
 
-from . import config, i18n
+from . import config, i18n, theme
 from .branding import activity_icon_url, brand
 from .logic import (
     COMPO_SUPPORT,
@@ -61,9 +61,9 @@ def same_role_note(event, lang: str = "en") -> str:
     return i18n.t(key, lang)
 
 
-COLOUR_OPEN = discord.Colour.blurple()
-COLOUR_FULL = discord.Colour.green()
-COLOUR_CANCELLED = discord.Colour.red()
+COLOUR_OPEN = theme.PINK
+COLOUR_FULL = theme.MINT
+COLOUR_CANCELLED = theme.BERRY
 
 # Discord caps a single field at 1024 chars, but also the whole embed at 6000.
 # A maxed-out siege (8 groups × 25) with a long waitlist can blow the total
@@ -130,7 +130,7 @@ def _role_field_value(members: list, classes: dict, open_count: int, lang: str) 
         parts.append(_names(members, classes))
     if open_count > 0:
         slot = i18n.t("event.open_slot", lang)
-        parts.extend([f"◦ *{slot}*"] * open_count)
+        parts.extend([f"♡ *{slot}*"] * open_count)
     return "\n".join(parts) if parts else "*—*"
 
 
@@ -188,7 +188,7 @@ def build_event_embed(
     if cancelled:
         colour = COLOUR_CANCELLED
     elif completed:
-        colour = discord.Colour.gold()
+        colour = theme.BUTTER
     elif full:
         colour = COLOUR_FULL
     else:
@@ -316,7 +316,7 @@ def build_rsvp_embed(
     embed = discord.Embed(
         title=f"{emoji} " + i18n.t("rsvp.title", lang, title=event["title"]),
         description=f"**{event['activity']}**{when}\n{hint}",
-        colour=discord.Colour.blurple(),
+        colour=theme.PINK,
     )
     brand(embed)
     embed.set_thumbnail(url=activity_icon_url(event["activity"]))

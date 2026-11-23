@@ -37,6 +37,13 @@ All notable changes to Kisk are documented here. The format follows
 
 ### Changed
 
+- **A pink, kawaii look.** Every embed now takes its colour from one pastel
+  palette (`bot/theme.py`): pink by default, mint for a full party, berry for
+  cancelled, butter for completed. Embeds are signed "Kawaii Kisk ♡" with a
+  new pink avatar, the panel has a new pink banner, and the player-facing
+  English replies are warmer (hearts and sparkles at the end of a line, the
+  instructions themselves unchanged). The artwork is now served from this
+  repository rather than upstream.
 - **The check-in fills empty seats by itself.** "Can't make it" now gives the
   seat up at once and the next player on the waitlist moves up. The waitlist
   is pinged by the check-in too and can answer it: 15 minutes before the start

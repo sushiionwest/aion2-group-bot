@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import i18n
+from .. import i18n, theme
 from ..branding import brand
 from ..embeds import ROLE_EMOJI, activity_emoji
 from ..errors import resilient_tick
@@ -46,7 +46,7 @@ def build_dashboard_embed(
     embed = discord.Embed(
         title="📊 " + i18n.t("dashboard.title", lang),
         description=i18n.t("dashboard.subtitle", lang),
-        colour=discord.Colour.blurple(),
+        colour=theme.PINK,
     )
     brand(embed)
 

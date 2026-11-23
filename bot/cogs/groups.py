@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import checkin, config, i18n
+from .. import checkin, config, i18n, theme
 from ..actions import post_event, publish_event, resolve_channel, type_ping_role
 from ..branding import brand
 from ..embeds import PRESENCE_ACTIVITY_EMOJI
@@ -367,7 +367,7 @@ class Groups(commands.Cog):
         embed = discord.Embed(
             title=i18n.t("events.title", lang),
             description=truncate_field("\n".join(lines), 4096),
-            colour=discord.Colour.blurple(),
+            colour=theme.PINK,
         )
         brand(embed)
         await interaction.response.send_message(embed=embed, ephemeral=True)

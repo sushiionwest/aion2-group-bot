@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..branding import brand
 from ..errors import ModalErrorMixin, ViewErrorMixin
 from ..logic import MAX_CHARACTERS
@@ -136,7 +136,7 @@ class ProfileSetupView(ViewErrorMixin, discord.ui.View):
                     class_line=class_line,
                     role_line=role_line,
                 ),
-                colour=discord.Colour.blurple(),
+                colour=theme.PINK,
             )
         )
 
@@ -352,7 +352,7 @@ class Onboarding(commands.GroupCog, name="onboard"):
             discord.Embed(
                 title=i18n.t("onboard.welcome_title", lang, guild=guild.name),
                 description=i18n.t("onboard.welcome_body", lang),
-                colour=discord.Colour.blurple(),
+                colour=theme.PINK,
             )
         )
 

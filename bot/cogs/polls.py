@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from .. import config, i18n
+from .. import config, i18n, theme
 from ..branding import brand
 from ..errors import ViewErrorMixin, resilient_tick
 from ..utils.availability import availability_ranking
@@ -41,7 +41,7 @@ def build_poll_embed(poll, votes: list, lang: str = "en") -> discord.Embed:
     closed = poll["status"] != "open"
     embed = discord.Embed(
         title=f"🗳️ {poll['question']}",
-        colour=discord.Colour.dark_grey() if closed else discord.Colour.blurple(),
+        colour=theme.MAUVE if closed else theme.PINK,
     )
     brand(embed)
     for i, option in enumerate(options):
@@ -179,7 +179,7 @@ def build_availability_embed(board, marks: list, lang: str = "en") -> discord.Em
     embed = discord.Embed(
         title=i18n.t("availability.title", lang, week=board["week_label"]),
         description=description,
-        colour=discord.Colour.green(),
+        colour=theme.MINT,
     )
     brand(embed)
     for i in range(7):

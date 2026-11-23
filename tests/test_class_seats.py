@@ -103,7 +103,7 @@ def test_a_templar_takes_the_tank_seat(tmp_path, monkeypatch):
         lambda w: _press(w, "tank", characters=[("Aegis", "Templar")]),
     )
     assert signup["role"] == "tank"
-    assert "You're in" in replies[0]
+    assert "you're in as" in replies[0]
 
 
 def test_a_chanter_takes_a_support_seat(tmp_path, monkeypatch):
